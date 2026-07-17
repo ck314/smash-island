@@ -1,0 +1,2989 @@
+{
+  "summary": "Exhaustively map the 5,861-line Battle for Smash Island monolith into an ES-module dependency graph for a Vite+Electron refactor",
+  "agentCount": 21,
+  "logs": [
+    "Mapped 19/19 slices; 325 top-level symbols catalogued",
+    "[stall] agent \"synthesize-map\" stalled (no progress) after 3141s — retrying (1/5)",
+    "[stall] agent \"synthesize-map\" stalled (no progress) after 1411s — retrying (2/5)"
+  ],
+  "result": {
+    "slicesMapped": 19,
+    "coreStateExports": [
+      {
+        "name": "cv",
+        "kind": "const",
+        "note": "main canvas element; LAZY-init on DOMContentLoaded via state.initDom(), never at import time"
+      },
+      {
+        "name": "ctx",
+        "kind": "const",
+        "note": "2D context from cv; lazy-init with cv"
+      },
+      {
+        "name": "W",
+        "kind": "let",
+        "note": "logical canvas width; reassigned by resize() — needs setter/object field"
+      },
+      {
+        "name": "H",
+        "kind": "let",
+        "note": "logical canvas height; reassigned by resize()"
+      },
+      {
+        "name": "WW",
+        "kind": "let",
+        "note": "world width; reassigned by setupWorld/applySnapshot/tourney"
+      },
+      {
+        "name": "WH",
+        "kind": "let",
+        "note": "world height; reassigned same places as WW"
+      },
+      {
+        "name": "camX",
+        "kind": "let",
+        "note": "camera X; read+WRITE in render/net/tourney/boss — expose via cam object or setter"
+      },
+      {
+        "name": "camY",
+        "kind": "let",
+        "note": "camera Y; same as camX"
+      },
+      {
+        "name": "shakeAmt",
+        "kind": "let",
+        "note": "screen-shake magnitude; CO-LOCATE the shake() setter here (moved out of draw.js) to break render<->hit/boss cycles"
+      },
+      {
+        "name": "running",
+        "kind": "let",
+        "note": "match-loop active flag; reassigned across router/modes/net/hit — setter required"
+      },
+      {
+        "name": "paused",
+        "kind": "let",
+        "note": "pause flag; toggled by input handler and modes"
+      },
+      {
+        "name": "raf",
+        "kind": "let",
+        "note": "requestAnimationFrame handle; assigned in loop(), read for cancelAnimationFrame in go()"
+      },
+      {
+        "name": "fighters",
+        "kind": "let",
+        "note": "active fighter array; REASSIGNED wholesale in buildFighters/applySnapshot — mutate state.fighters, never bare import"
+      },
+      {
+        "name": "particles",
+        "kind": "let",
+        "note": "particle pool; reassigned via filter in step and cleared by summons — never reassign an imported binding"
+      },
+      {
+        "name": "projectiles",
+        "kind": "let",
+        "note": "projectile pool; reassigned via filter in step/updateSummons"
+      },
+      {
+        "name": "beams",
+        "kind": "let",
+        "note": "beam pool; reassigned via filter in step"
+      },
+      {
+        "name": "items",
+        "kind": "let",
+        "note": "pickup pool; reassigned via filter in updateItems"
+      },
+      {
+        "name": "summons",
+        "kind": "let",
+        "note": "assist/boss summon pool; reassigned via filter"
+      },
+      {
+        "name": "tendrils",
+        "kind": "let",
+        "note": "Evil Leafy tendril pool; reassigned via filter and cleared by Eraser"
+      },
+      {
+        "name": "worldPlats",
+        "kind": "let",
+        "note": "world platform geometry; reassigned via filter in budgetCutPlatform"
+      },
+      {
+        "name": "floors",
+        "kind": "let",
+        "note": "floor geometry; reassigned by setupWorld/applySnapshot"
+      },
+      {
+        "name": "worldZones",
+        "kind": "let",
+        "note": "named world zones"
+      },
+      {
+        "name": "spawnZones",
+        "kind": "let",
+        "note": "spawn-point zones; reassigned by setupWorld/buildSpawnZones"
+      },
+      {
+        "name": "bases",
+        "kind": "let",
+        "note": "team base structures; reassigned by setupWorld/applySnapshot"
+      },
+      {
+        "name": "hazardT",
+        "kind": "let",
+        "note": "master frame counter; mutated via hazardT++ — MUST be object field (state.hazardT), cannot ++ an import"
+      },
+      {
+        "name": "itemTimer",
+        "kind": "let",
+        "note": "item spawn countdown; mutated via -- and reassign"
+      },
+      {
+        "name": "lastKoFrame",
+        "kind": "let",
+        "note": "frame of last KO; written as lastKoFrame=hazardT in eliminate (strict-mode implicit-global hazard)"
+      },
+      {
+        "name": "evil",
+        "kind": "let",
+        "note": "evil-leafy hazard entity ref (null when none)"
+      },
+      {
+        "name": "STOMACH",
+        "kind": "const",
+        "note": "Purple Face swallow zone {x,y,r}; mutated in place by fireSwallow, read by draw.js"
+      },
+      {
+        "name": "BOSS_ARENA",
+        "kind": "let",
+        "note": "current boss backdrop id; written by spawnBossRushBoss/beginMatchNow, read by renderer"
+      },
+      {
+        "name": "down",
+        "kind": "const",
+        "note": "keydown pressed-state map keyed by event.code; mutate props (never reassign)"
+      },
+      {
+        "name": "KEYS",
+        "kind": "let",
+        "note": "live P1 key map; reassigned by resetKeys (deep clone of DEFAULT_KEYS)"
+      },
+      {
+        "name": "KEYS_P2",
+        "kind": "let",
+        "note": "live P2 key map"
+      },
+      {
+        "name": "LOCAL_PLAYERS",
+        "kind": "let",
+        "note": "humans at keyboard (1|2); written by lobby/coop toggles"
+      },
+      {
+        "name": "AI_LEVEL",
+        "kind": "let",
+        "note": "AI difficulty 0/1/2; must be initialized before first aiThink or handicap silently no-ops"
+      },
+      {
+        "name": "chosen",
+        "kind": "let",
+        "note": "selected fighter; init chosen=ROSTER.find(r=>r.play) — needs ROSTER at state eval time"
+      },
+      {
+        "name": "stage",
+        "kind": "let",
+        "note": "selected stage; init stage=STAGES[0]; REASSIGNED in select/boss-rush/tourney/editor — setter required"
+      },
+      {
+        "name": "SETTINGS",
+        "kind": "const",
+        "note": "match-config singleton; MUTATE PROPS ONLY, never re-export as primitive"
+      },
+      {
+        "name": "TESTMODE",
+        "kind": "const",
+        "note": "test/sandbox config+runtime (active/dummies/damage/anchored/dps); mutate props"
+      },
+      {
+        "name": "TUT",
+        "kind": "const",
+        "note": "tutorial runtime {active,step,done,timer}; mutate props"
+      },
+      {
+        "name": "BOSSRUSH",
+        "kind": "object",
+        "note": "boss-rush runtime; initial value MUST include loop:0 and dmgMult:1 or early readers get undefined"
+      },
+      {
+        "name": "CUSTOM_LEVEL",
+        "kind": "let",
+        "note": "editor custom level (null until set); reassigned by playCustomLevel — setter required"
+      },
+      {
+        "name": "TOURNEY",
+        "kind": "let",
+        "note": "tournament runtime object; reassigned wholesale in startTournament"
+      },
+      {
+        "name": "TOURNEY_MATCH_ACTIVE",
+        "kind": "let",
+        "note": "true only while a tourney match is played/watched; gates loop/draw"
+      },
+      {
+        "name": "TOURNEY_WATCHING",
+        "kind": "let",
+        "note": "fixture being watched live (null when none)"
+      },
+      {
+        "name": "PENDING_TOURNEY",
+        "kind": "let",
+        "note": "queued World Cup awaiting char pick"
+      },
+      {
+        "name": "TOURNEY_SETUP_SIZE",
+        "kind": "let",
+        "note": "team size from setup screen"
+      },
+      {
+        "name": "TOURNEY_SETUP_MODE",
+        "kind": "let",
+        "note": "'spectate'|'normal' from setup screen"
+      },
+      {
+        "name": "PENDING_CUSTOM",
+        "kind": "let",
+        "note": "custom-level queued flag for select-screen Start button"
+      },
+      {
+        "name": "TEAM_PLAN",
+        "kind": "let",
+        "note": "co-op plan keyed by team index (focus/stance/protect); assigned as implicit global today — must be declared/exported here"
+      },
+      {
+        "name": "elimSeq",
+        "kind": "number",
+        "note": "MIGRATED from window.__elimSeq; team elimination-order counter written by eliminate/beginMatchNow, expose via setter"
+      }
+    ],
+    "modules": [
+      {
+        "path": "index.html",
+        "purpose": "Vite entry: DOM shell only (canvas #cv + all .screen templates). No logic. Every domId consumed by CSS and JS getElementById must be preserved verbatim; screen visibility is class-driven (.screen/.screen.active/#hud.active) — a hidden JS<->CSS contract.",
+        "exports": [],
+        "sourceRanges": [
+          "281-650"
+        ],
+        "importsFrom": []
+      },
+      {
+        "path": "styles/tokens.css + styles/app.css",
+        "purpose": "Entire <style> block. :root custom props (--grass/--host/--gold/--panel/--danger...) load FIRST as the token layer. Remote @import of Fredoka/JetBrains fonts must be replaced with a bundled @fontsource import (Electron/strict-CSP blocks the network fetch).",
+        "exports": [],
+        "sourceRanges": [
+          "7-280"
+        ],
+        "importsFrom": []
+      },
+      {
+        "path": "src/core/constants.js",
+        "purpose": "Immutable tunables + control defaults. Leaf module (no imports). Import eagerly so physics/hit consts are past their TDZ before any frame.",
+        "exports": [
+          "DEFAULT_KEYS",
+          "DEFAULT_KEYS_P2",
+          "KEY_LABELS",
+          "MAX_FFA",
+          "MAX_TEAMS",
+          "TEAM_COLORS",
+          "CAM_ZOOM",
+          "TOURNEY_TIME_LIMIT",
+          "CLAIM_FRAMES",
+          "GRAV",
+          "MOVE",
+          "MAXVX",
+          "JUMP",
+          "FRICTION",
+          "POINTED",
+          "ITEM_KINDS",
+          "FREEZE_MAX",
+          "REFREEZE_GAP",
+          "CTRLREV_MAX",
+          "RESCRAMBLE_GAP",
+          "CURSE_MAX_STACKS",
+          "CURSE_FLOOR",
+          "CURSE_DECAY",
+          "PLACE_MAX"
+        ],
+        "sourceRanges": [
+          "838-847",
+          "858-877",
+          "1021",
+          "1300",
+          "2173",
+          "2420",
+          "2455",
+          "2485",
+          "4435-4462",
+          "4769"
+        ],
+        "importsFrom": []
+      },
+      {
+        "path": "src/data/roster.js",
+        "purpose": "Fighter roster + assist + boss data tables (source of truth for select, kit dispatch, boss-rush, assists). Leaf. NOTE: ROSTER may be mutated in place by balance code — export the live object, do not freeze.",
+        "exports": [
+          "ROSTER",
+          "ASSIST_ROSTER",
+          "BOSS_ROSTER"
+        ],
+        "sourceRanges": [
+          "658-779",
+          "2456-2484"
+        ],
+        "importsFrom": []
+      },
+      {
+        "path": "src/data/stages.js",
+        "purpose": "Stadium/stage definitions. Leaf.",
+        "exports": [
+          "STAGES"
+        ],
+        "sourceRanges": [
+          "780-837"
+        ],
+        "importsFrom": []
+      },
+      {
+        "path": "src/data/smashes.js",
+        "purpose": "Personalized smash-attack function table keyed by kit.special. Method bodies call engine helpers only at INVOCATION time, so the data<->engine import cycle is benign under ESM.",
+        "exports": [
+          "SMASHES"
+        ],
+        "sourceRanges": [
+          "3740-3886"
+        ],
+        "importsFrom": [
+          {
+            "module": "src/core/state.js",
+            "symbols": [
+              "fighters",
+              "projectiles",
+              "beams"
+            ]
+          },
+          {
+            "module": "src/engine/hit.js",
+            "symbols": [
+              "applyHit",
+              "hitCircle",
+              "applyFreeze",
+              "freezeDuration"
+            ]
+          },
+          {
+            "module": "src/engine/combat.js",
+            "symbols": [
+              "spawnProj",
+              "dropProj"
+            ]
+          },
+          {
+            "module": "src/engine/particles.js",
+            "symbols": [
+              "puff"
+            ]
+          },
+          {
+            "module": "src/engine/physics.js",
+            "symbols": [
+              "feetY",
+              "groundY",
+              "clamp"
+            ]
+          },
+          {
+            "module": "src/engine/attacks.js",
+            "symbols": [
+              "comebackFlavor"
+            ]
+          },
+          {
+            "module": "src/ui/hud.js",
+            "symbols": [
+              "banner"
+            ]
+          }
+        ]
+      },
+      {
+        "path": "src/audio/audio.js",
+        "purpose": "SFX + music synth (being rebuilt; tag audio). Self-contained. Import-time window unlock listeners (pointerdown/keydown/touchstart) must be registered from main.js boot, not as a bare import side effect. All fns already guard SND.ctx===null.",
+        "exports": [
+          "SFX",
+          "startMusic",
+          "stopMusic",
+          "musicNote",
+          "sndInit",
+          "sndResume",
+          "toggleSound",
+          "tone",
+          "noise",
+          "SND"
+        ],
+        "sourceRanges": [
+          "883-1009"
+        ],
+        "importsFrom": []
+      },
+      {
+        "path": "src/core/state.js",
+        "purpose": "All mutable shared singletons + reassignment setters + shake(). Initializes chosen=ROSTER.find(play) and stage=STAGES[0] and KEYS from DEFAULT_KEYS at eval time. cv/ctx resolved lazily via initDom() on DOMContentLoaded. shake() lives here (co-located with shakeAmt) to break render<->hit/boss cycles.",
+        "exports": [
+          "(all coreStateExports)",
+          "initDom",
+          "setStage",
+          "setChosen",
+          "setKeys",
+          "shake",
+          "decayShake"
+        ],
+        "sourceRanges": [
+          "844-857",
+          "1010-1019",
+          "1207",
+          "1295-1300",
+          "1307",
+          "1563",
+          "1722",
+          "1798",
+          "2920",
+          "2961",
+          "4580",
+          "4934",
+          "6451"
+        ],
+        "importsFrom": [
+          {
+            "module": "src/data/roster.js",
+            "symbols": [
+              "ROSTER"
+            ]
+          },
+          {
+            "module": "src/data/stages.js",
+            "symbols": [
+              "STAGES"
+            ]
+          },
+          {
+            "module": "src/core/constants.js",
+            "symbols": [
+              "DEFAULT_KEYS",
+              "DEFAULT_KEYS_P2"
+            ]
+          }
+        ]
+      },
+      {
+        "path": "src/engine/physics.js",
+        "purpose": "Layout predicates + geometry/util helpers. Near-leaf (imports only state). Home for the global clamp() util that everything imports.",
+        "exports": [
+          "isBig",
+          "isBigFFA",
+          "scrolls",
+          "clamp",
+          "feetY",
+          "groundY",
+          "stageScale",
+          "applyZone"
+        ],
+        "sourceRanges": [
+          "1020-1023",
+          "2005-2010",
+          "4568-4579"
+        ],
+        "importsFrom": [
+          {
+            "module": "src/core/state.js",
+            "symbols": [
+              "SETTINGS",
+              "stage",
+              "CUSTOM_LEVEL",
+              "WW",
+              "WH",
+              "W",
+              "H"
+            ]
+          }
+        ]
+      },
+      {
+        "path": "src/engine/particles.js",
+        "purpose": "Particle emitter. Near-leaf (imports only state). puff() is imported widely.",
+        "exports": [
+          "puff"
+        ],
+        "sourceRanges": [
+          "4836-4846"
+        ],
+        "importsFrom": [
+          {
+            "module": "src/core/state.js",
+            "symbols": [
+              "particles"
+            ]
+          }
+        ]
+      },
+      {
+        "path": "src/engine/combat.js",
+        "purpose": "Items + projectile factories + assist/boss summon spawners. updateItems calls updateSummons (boss.js) → combat<->boss call-time cycle.",
+        "exports": [
+          "itemSpawnInterval",
+          "spawnItem",
+          "updateItems",
+          "pickUpItem",
+          "summonAssist",
+          "summonBoss",
+          "spawnProj",
+          "dropProj"
+        ],
+        "sourceRanges": [
+          "2487-2555",
+          "4374-4388"
+        ],
+        "importsFrom": [
+          {
+            "module": "src/core/state.js",
+            "symbols": [
+              "SETTINGS",
+              "items",
+              "itemTimer",
+              "fighters",
+              "summons",
+              "projectiles",
+              "camY",
+              "WW"
+            ]
+          },
+          {
+            "module": "src/core/constants.js",
+            "symbols": [
+              "POINTED",
+              "ITEM_KINDS"
+            ]
+          },
+          {
+            "module": "src/data/roster.js",
+            "symbols": [
+              "ASSIST_ROSTER",
+              "BOSS_ROSTER"
+            ]
+          },
+          {
+            "module": "src/engine/physics.js",
+            "symbols": [
+              "groundY",
+              "clamp"
+            ]
+          },
+          {
+            "module": "src/engine/particles.js",
+            "symbols": [
+              "puff"
+            ]
+          },
+          {
+            "module": "src/engine/boss.js",
+            "symbols": [
+              "updateSummons"
+            ]
+          },
+          {
+            "module": "src/audio/audio.js",
+            "symbols": [
+              "SFX"
+            ]
+          }
+        ]
+      },
+      {
+        "path": "src/engine/boss.js",
+        "purpose": "Boss AI + attacks + swallow/tendrils + updateSummons dispatch. BOSS_ATK_ID stays module-local (both increments live here). updateSummons straddles boss dispatch + item/assist behavior switch (no summons module in layout).",
+        "exports": [
+          "updateBossAttack",
+          "updateSummons",
+          "spawnTendril",
+          "updateTendrils",
+          "fireSwallow",
+          "updateSwallow",
+          "freeFromStomach",
+          "bossDmg",
+          "BOSS_DMG_BASE",
+          "bossAtkGap",
+          "onBossPhaseChange",
+          "bossPhaseName",
+          "bossTelLen",
+          "bossTelName",
+          "fireBossAttack",
+          "budgetCutPlatform"
+        ],
+        "sourceRanges": [
+          "2556-2740",
+          "2916-2977",
+          "2977-3075"
+        ],
+        "importsFrom": [
+          {
+            "module": "src/core/state.js",
+            "symbols": [
+              "fighters",
+              "summons",
+              "projectiles",
+              "beams",
+              "items",
+              "worldPlats",
+              "tendrils",
+              "STOMACH",
+              "BOSSRUSH",
+              "BOSS_ARENA",
+              "SETTINGS",
+              "WW",
+              "hazardT",
+              "camX",
+              "camY",
+              "shake"
+            ]
+          },
+          {
+            "module": "src/core/constants.js",
+            "symbols": [
+              "GRAV",
+              "POINTED"
+            ]
+          },
+          {
+            "module": "src/engine/physics.js",
+            "symbols": [
+              "groundY",
+              "clamp",
+              "isBigFFA"
+            ]
+          },
+          {
+            "module": "src/engine/combat.js",
+            "symbols": [
+              "spawnProj",
+              "dropProj"
+            ]
+          },
+          {
+            "module": "src/engine/particles.js",
+            "symbols": [
+              "puff"
+            ]
+          },
+          {
+            "module": "src/engine/hit.js",
+            "symbols": [
+              "applyHit"
+            ]
+          },
+          {
+            "module": "src/ui/hud.js",
+            "symbols": [
+              "banner"
+            ]
+          },
+          {
+            "module": "src/audio/audio.js",
+            "symbols": [
+              "SFX"
+            ]
+          }
+        ]
+      },
+      {
+        "path": "src/engine/hit.js",
+        "purpose": "Central hit resolution (applyHit is recursive; keep applyHit+hitCircle+damageSummons co-located). Freeze/ctrl-reversal appliers, knock, eliminate. applyHit body spans 4463-4560 (slice-cut); reunite whole.",
+        "exports": [
+          "applyHit",
+          "hitCircle",
+          "damageSummons",
+          "applyFreeze",
+          "freezeDuration",
+          "applyCtrlRev",
+          "knock",
+          "eliminate"
+        ],
+        "sourceRanges": [
+          "4389-4476",
+          "4476-4560",
+          "4561-4657"
+        ],
+        "importsFrom": [
+          {
+            "module": "src/core/state.js",
+            "symbols": [
+              "fighters",
+              "projectiles",
+              "summons",
+              "particles",
+              "camY",
+              "SETTINGS",
+              "hazardT",
+              "lastKoFrame",
+              "running",
+              "TESTMODE",
+              "bases",
+              "chosen",
+              "TOURNEY",
+              "TOURNEY_WATCHING",
+              "W",
+              "WH",
+              "shake",
+              "elimSeq"
+            ]
+          },
+          {
+            "module": "src/core/constants.js",
+            "symbols": [
+              "CURSE_MAX_STACKS",
+              "CURSE_FLOOR",
+              "CURSE_DECAY",
+              "FREEZE_MAX",
+              "REFREEZE_GAP",
+              "CTRLREV_MAX",
+              "RESCRAMBLE_GAP"
+            ]
+          },
+          {
+            "module": "src/engine/physics.js",
+            "symbols": [
+              "feetY",
+              "groundY",
+              "isBig",
+              "isBigFFA",
+              "clamp"
+            ]
+          },
+          {
+            "module": "src/engine/particles.js",
+            "symbols": [
+              "puff"
+            ]
+          },
+          {
+            "module": "src/engine/boss.js",
+            "symbols": [
+              "bossDmg",
+              "freeFromStomach"
+            ]
+          },
+          {
+            "module": "src/engine/attacks.js",
+            "symbols": [
+              "comebackPoints",
+              "comebackFlavor",
+              "comebackRange",
+              "comebackShots",
+              "COMEBACK",
+              "COMEBACK_IFRAME_FLOOR"
+            ]
+          },
+          {
+            "module": "src/ui/hud.js",
+            "symbols": [
+              "banner"
+            ]
+          },
+          {
+            "module": "src/audio/audio.js",
+            "symbols": [
+              "SFX"
+            ]
+          },
+          {
+            "module": "src/modes/arena.js",
+            "symbols": [
+              "ffaRespawn"
+            ]
+          },
+          {
+            "module": "src/modes/boss-rush.js",
+            "symbols": [
+              "bossRushCheck"
+            ]
+          }
+        ]
+      },
+      {
+        "path": "src/engine/attacks.js",
+        "purpose": "Main X attack + smashes dispatch + comeback scaling + RANGE_PROFILE/RANGED_ATTACKERS tables. doSmash imports SMASHES (data) → attacks<->smashes call-time cycle. Houses RANGE_PROFILE (roster-screen imports it from here).",
+        "exports": [
+          "doAttack",
+          "doSmash",
+          "doGroundMove",
+          "genericSmash",
+          "comebackPoints",
+          "comebackFlavor",
+          "comebackShots",
+          "comebackRange",
+          "rangeProfile",
+          "RANGE_PROFILE",
+          "RANGED_ATTACKERS",
+          "COMEBACK",
+          "COMEBACK_IFRAME_FLOOR",
+          "COMEBACK_MAX_POINTS"
+        ],
+        "sourceRanges": [
+          "3561-3739",
+          "3887-3990",
+          "3990-4009"
+        ],
+        "importsFrom": [
+          {
+            "module": "src/core/state.js",
+            "symbols": [
+              "fighters",
+              "projectiles",
+              "beams"
+            ]
+          },
+          {
+            "module": "src/data/smashes.js",
+            "symbols": [
+              "SMASHES"
+            ]
+          },
+          {
+            "module": "src/engine/hit.js",
+            "symbols": [
+              "applyHit",
+              "hitCircle",
+              "applyFreeze",
+              "freezeDuration"
+            ]
+          },
+          {
+            "module": "src/engine/combat.js",
+            "symbols": [
+              "spawnProj",
+              "dropProj"
+            ]
+          },
+          {
+            "module": "src/engine/particles.js",
+            "symbols": [
+              "puff"
+            ]
+          },
+          {
+            "module": "src/engine/physics.js",
+            "symbols": [
+              "feetY",
+              "groundY",
+              "clamp"
+            ]
+          },
+          {
+            "module": "src/ui/hud.js",
+            "symbols": [
+              "banner"
+            ]
+          }
+        ]
+      },
+      {
+        "path": "src/engine/specials.js",
+        "purpose": "Up/down/attack/neutral special dispatch tables + doSpecial big switch + DASH_KITS + applyDashVY. Object keys use reserved words ('switch','static') — minifier must not mangle string keys.",
+        "exports": [
+          "doSpecial",
+          "doUpSpecial",
+          "doDownSpecial",
+          "doAttackSpecial",
+          "applyDashVY",
+          "DASH_KITS",
+          "upLaunch",
+          "UPSPECIALS",
+          "DOWNSPECIALS",
+          "ATKSPECIALS"
+        ],
+        "sourceRanges": [
+          "3896-4009",
+          "4012-4373"
+        ],
+        "importsFrom": [
+          {
+            "module": "src/core/state.js",
+            "symbols": [
+              "fighters",
+              "projectiles",
+              "summons",
+              "camY",
+              "SETTINGS",
+              "hazardT"
+            ]
+          },
+          {
+            "module": "src/engine/combat.js",
+            "symbols": [
+              "spawnProj",
+              "dropProj"
+            ]
+          },
+          {
+            "module": "src/engine/hit.js",
+            "symbols": [
+              "hitCircle",
+              "applyHit",
+              "applyFreeze",
+              "freezeDuration",
+              "applyCtrlRev",
+              "knock"
+            ]
+          },
+          {
+            "module": "src/engine/particles.js",
+            "symbols": [
+              "puff"
+            ]
+          },
+          {
+            "module": "src/engine/physics.js",
+            "symbols": [
+              "feetY",
+              "groundY",
+              "clamp"
+            ]
+          },
+          {
+            "module": "src/engine/boss.js",
+            "symbols": [
+              "bossDmg",
+              "freeFromStomach"
+            ]
+          },
+          {
+            "module": "src/engine/attacks.js",
+            "symbols": [
+              "comebackFlavor",
+              "comebackRange",
+              "comebackShots"
+            ]
+          },
+          {
+            "module": "src/ui/hud.js",
+            "symbols": [
+              "banner"
+            ]
+          },
+          {
+            "module": "src/audio/audio.js",
+            "symbols": [
+              "SFX"
+            ]
+          }
+        ]
+      },
+      {
+        "path": "src/engine/fighter.js",
+        "purpose": "Match-lineup bootstrap (buildFighters/makeFighter/shuffle), master sim tick step(), and the RAF driver loop(). loop() and step() are relocated HERE (not main.js) so mode starters can call loop() without a modes->entry cycle. step() body spans 3076-3548 (slice-cut) — keep whole. buildFighters reads window.__netRoster/window.NET.",
+        "exports": [
+          "buildFighters",
+          "makeFighter",
+          "shuffle",
+          "step",
+          "loop"
+        ],
+        "sourceRanges": [
+          "2239-2353",
+          "2422-2454",
+          "3076-3548"
+        ],
+        "importsFrom": [
+          {
+            "module": "src/core/state.js",
+            "symbols": [
+              "fighters",
+              "projectiles",
+              "summons",
+              "particles",
+              "beams",
+              "worldZones",
+              "evil",
+              "stage",
+              "hazardT",
+              "down",
+              "KEYS",
+              "KEYS_P2",
+              "camX",
+              "camY",
+              "WW",
+              "WH",
+              "chosen",
+              "SETTINGS",
+              "TESTMODE",
+              "bases",
+              "spawnZones",
+              "LOCAL_PLAYERS",
+              "running",
+              "paused",
+              "raf"
+            ]
+          },
+          {
+            "module": "src/core/constants.js",
+            "symbols": [
+              "MOVE",
+              "FRICTION",
+              "MAXVX",
+              "JUMP",
+              "GRAV",
+              "MAX_TEAMS",
+              "MAX_FFA",
+              "TEAM_COLORS"
+            ]
+          },
+          {
+            "module": "src/data/roster.js",
+            "symbols": [
+              "ROSTER"
+            ]
+          },
+          {
+            "module": "src/engine/physics.js",
+            "symbols": [
+              "isBig",
+              "isBigFFA",
+              "groundY",
+              "clamp",
+              "applyZone"
+            ]
+          },
+          {
+            "module": "src/engine/specials.js",
+            "symbols": [
+              "doSpecial",
+              "doUpSpecial",
+              "doDownSpecial",
+              "doAttackSpecial",
+              "DASH_KITS"
+            ]
+          },
+          {
+            "module": "src/engine/attacks.js",
+            "symbols": [
+              "doAttack",
+              "doSmash",
+              "doGroundMove"
+            ]
+          },
+          {
+            "module": "src/engine/hit.js",
+            "symbols": [
+              "applyHit",
+              "applyFreeze",
+              "freezeDuration",
+              "applyCtrlRev",
+              "knock",
+              "eliminate"
+            ]
+          },
+          {
+            "module": "src/engine/particles.js",
+            "symbols": [
+              "puff"
+            ]
+          },
+          {
+            "module": "src/ai/ai.js",
+            "symbols": [
+              "aiThink"
+            ]
+          },
+          {
+            "module": "src/ui/hud.js",
+            "symbols": [
+              "updateHUD",
+              "banner"
+            ]
+          },
+          {
+            "module": "src/ui/controls-remap.js",
+            "symbols": [
+              "pollPad"
+            ]
+          },
+          {
+            "module": "src/render/draw.js",
+            "symbols": [
+              "draw",
+              "updateCamera"
+            ]
+          },
+          {
+            "module": "src/modes/arena.js",
+            "symbols": [
+              "platRects",
+              "checkWin",
+              "updateSpawnZones",
+              "testDpsTick"
+            ]
+          },
+          {
+            "module": "src/modes/tutorial.js",
+            "symbols": [
+              "tutorialTick"
+            ]
+          },
+          {
+            "module": "src/modes/tournament.js",
+            "symbols": [
+              "tourneyLiveTick"
+            ]
+          },
+          {
+            "module": "src/modes/boss-rush.js",
+            "symbols": [
+              "bossRushCheck"
+            ]
+          },
+          {
+            "module": "src/engine/combat.js",
+            "symbols": [
+              "updateItems"
+            ]
+          },
+          {
+            "module": "src/engine/boss.js",
+            "symbols": [
+              "updateTendrils"
+            ]
+          },
+          {
+            "module": "src/net/netcode.js",
+            "symbols": [
+              "applySnapshot",
+              "serializeState"
+            ]
+          }
+        ]
+      },
+      {
+        "path": "src/ai/ai.js",
+        "purpose": "AI classes/profiles + navigation helpers + aiThink/finishAI. Clean: imports physics+state+roster only (does NOT import fighter), so no cycle with the sim loop. Nav helpers stay internal.",
+        "exports": [
+          "aiThink"
+        ],
+        "sourceRanges": [
+          "4847-4935",
+          "4942-5405"
+        ],
+        "importsFrom": [
+          {
+            "module": "src/core/state.js",
+            "symbols": [
+              "fighters",
+              "SETTINGS",
+              "summons",
+              "items",
+              "spawnZones",
+              "TEAM_PLAN",
+              "AI_LEVEL",
+              "hazardT",
+              "lastKoFrame",
+              "worldPlats",
+              "bases",
+              "WW",
+              "WH",
+              "W"
+            ]
+          },
+          {
+            "module": "src/data/roster.js",
+            "symbols": [
+              "ROSTER"
+            ]
+          },
+          {
+            "module": "src/engine/physics.js",
+            "symbols": [
+              "isBig",
+              "isBigFFA",
+              "scrolls",
+              "groundY",
+              "clamp"
+            ]
+          }
+        ]
+      },
+      {
+        "path": "src/render/draw.js",
+        "purpose": "Camera + master render + all draw* helpers + resize(). shake()/shakeAmt MOVED to state.js so hit/boss don't import draw. BOSS_SPRITE_IMG stays render-local. draw imports tutorial/arena/boss for overlay text (one-directional except arena<->draw via resize/testDpsText, call-time safe).",
+        "exports": [
+          "draw",
+          "updateCamera",
+          "resize",
+          "drawItem",
+          "drawBossBar",
+          "drawMinimap",
+          "drawFighter"
+        ],
+        "sourceRanges": [
+          "1244-1253",
+          "5409-5949"
+        ],
+        "importsFrom": [
+          {
+            "module": "src/core/state.js",
+            "symbols": [
+              "fighters",
+              "camX",
+              "camY",
+              "shakeAmt",
+              "decayShake",
+              "hazardT",
+              "stage",
+              "SETTINGS",
+              "bases",
+              "worldZones",
+              "worldPlats",
+              "spawnZones",
+              "items",
+              "summons",
+              "tendrils",
+              "projectiles",
+              "beams",
+              "particles",
+              "evil",
+              "BOSS_ARENA",
+              "BOSSRUSH",
+              "TESTMODE",
+              "STOMACH",
+              "ctx",
+              "cv",
+              "W",
+              "H",
+              "WW",
+              "WH"
+            ]
+          },
+          {
+            "module": "src/core/constants.js",
+            "symbols": [
+              "CAM_ZOOM",
+              "CLAIM_FRAMES",
+              "TEAM_COLORS"
+            ]
+          },
+          {
+            "module": "src/engine/physics.js",
+            "symbols": [
+              "scrolls",
+              "clamp",
+              "groundY",
+              "isBig",
+              "isBigFFA"
+            ]
+          },
+          {
+            "module": "src/engine/boss.js",
+            "symbols": [
+              "bossTelLen"
+            ]
+          },
+          {
+            "module": "src/modes/tutorial.js",
+            "symbols": [
+              "drawTutorialPrompt"
+            ]
+          },
+          {
+            "module": "src/modes/arena.js",
+            "symbols": [
+              "testDpsText"
+            ]
+          }
+        ]
+      },
+      {
+        "path": "src/ui/hud.js",
+        "purpose": "HUD build/update + standings + banner + result screen + scorecard + placement scoring. banner is a widely-imported near-leaf. showResult imports arena (recorder) → hud<->arena call-time cycle.",
+        "exports": [
+          "buildHUD",
+          "updateHUD",
+          "updateStandings",
+          "banner",
+          "pctColor",
+          "showResult",
+          "renderScorecard",
+          "placementValue",
+          "placementWinsLosses",
+          "ORDINAL"
+        ],
+        "sourceRanges": [
+          "2354-2417",
+          "4770-4835"
+        ],
+        "importsFrom": [
+          {
+            "module": "src/core/state.js",
+            "symbols": [
+              "fighters",
+              "SETTINGS",
+              "stage",
+              "chosen",
+              "TESTMODE",
+              "running"
+            ]
+          },
+          {
+            "module": "src/core/constants.js",
+            "symbols": [
+              "TEAM_COLORS",
+              "PLACE_MAX",
+              "MAX_TEAMS"
+            ]
+          },
+          {
+            "module": "src/audio/audio.js",
+            "symbols": [
+              "SFX",
+              "stopMusic"
+            ]
+          },
+          {
+            "module": "src/modes/arena.js",
+            "symbols": [
+              "stopRunRecording",
+              "showRunReview"
+            ]
+          }
+        ]
+      },
+      {
+        "path": "src/ui/router.js",
+        "purpose": "Screen router go(): switches active .screen, cancels loop (running=false;cancelAnimationFrame(raf)), resets mode flags on exit-to-title, rebuilds board/maps. Tolerates unknown ids ('_none_' hides all). Imported by nearly every module (call-time).",
+        "exports": [
+          "go"
+        ],
+        "sourceRanges": [
+          "1026-1044"
+        ],
+        "importsFrom": [
+          {
+            "module": "src/core/state.js",
+            "symbols": [
+              "running",
+              "raf",
+              "TESTMODE",
+              "TUT",
+              "TOURNEY",
+              "BOSSRUSH",
+              "CUSTOM_LEVEL",
+              "PENDING_TOURNEY",
+              "PENDING_CUSTOM",
+              "setStage"
+            ]
+          },
+          {
+            "module": "src/ui/roster-screen.js",
+            "symbols": [
+              "buildBoard",
+              "buildStages",
+              "buildSettings"
+            ]
+          },
+          {
+            "module": "src/ui/controls-remap.js",
+            "symbols": [
+              "buildMaps"
+            ]
+          },
+          {
+            "module": "src/modes/arena.js",
+            "symbols": [
+              "stopRunRecording"
+            ]
+          }
+        ]
+      },
+      {
+        "path": "src/ui/roster-screen.js",
+        "purpose": "Character-select board + settings segmented controls + count/team-split/summary/move-card builders. Module-local STARTERS/SHOW_ALL_CHARS. buildSettings calls refreshTeamChat (coop) → roster-screen<->coop cycle.",
+        "exports": [
+          "buildBoard",
+          "buildSettings",
+          "buildStages",
+          "syncModeUI",
+          "buildCountButtons",
+          "buildTeamSplits",
+          "updateSummary",
+          "refreshSel",
+          "countOptions",
+          "teamSplitsFor"
+        ],
+        "sourceRanges": [
+          "860-877",
+          "1045-1191"
+        ],
+        "importsFrom": [
+          {
+            "module": "src/core/state.js",
+            "symbols": [
+              "SETTINGS",
+              "chosen",
+              "stage",
+              "LOCAL_PLAYERS",
+              "AI_LEVEL",
+              "TOURNEY_SETUP_SIZE",
+              "TOURNEY_SETUP_MODE",
+              "CUSTOM_LEVEL",
+              "setChosen",
+              "setStage"
+            ]
+          },
+          {
+            "module": "src/core/constants.js",
+            "symbols": [
+              "MAX_FFA",
+              "MAX_TEAMS"
+            ]
+          },
+          {
+            "module": "src/data/roster.js",
+            "symbols": [
+              "ROSTER"
+            ]
+          },
+          {
+            "module": "src/data/stages.js",
+            "symbols": [
+              "STAGES"
+            ]
+          },
+          {
+            "module": "src/engine/attacks.js",
+            "symbols": [
+              "RANGE_PROFILE"
+            ]
+          },
+          {
+            "module": "src/modes/coop-planning.js",
+            "symbols": [
+              "refreshTeamChat"
+            ]
+          }
+        ]
+      },
+      {
+        "path": "src/ui/controls-remap.js",
+        "purpose": "Control-remap rows + reset + gamepad polling. Module-local listening. pollPad is consumed by engine/fighter.step (layering oddity, kept per layout). The global keydown/keyup capture is registered from main.js, calling an exported captureRemapKey(e)+isListening() accessor since listening is module-local.",
+        "exports": [
+          "buildMaps",
+          "resetKeys",
+          "niceKey",
+          "pollPad",
+          "captureRemapKey",
+          "isListening"
+        ],
+        "sourceRanges": [
+          "1192-1206",
+          "1226-1241"
+        ],
+        "importsFrom": [
+          {
+            "module": "src/core/state.js",
+            "symbols": [
+              "KEYS",
+              "setKeys"
+            ]
+          },
+          {
+            "module": "src/core/constants.js",
+            "symbols": [
+              "KEY_LABELS",
+              "DEFAULT_KEYS"
+            ]
+          }
+        ]
+      },
+      {
+        "path": "src/ui/balance-stats.js",
+        "purpose": "BStore storage abstraction (window.storage||localStorage) + recordMatch + stats viewer/export/reset. In Electron renderer window.storage is absent — must guarantee localStorage. BStore also imported by level-editor.",
+        "exports": [
+          "BStore",
+          "recordMatch",
+          "openStats",
+          "exportStats",
+          "resetStats"
+        ],
+        "sourceRanges": [
+          "4708-4768",
+          "6454-6513"
+        ],
+        "importsFrom": [
+          {
+            "module": "src/core/state.js",
+            "symbols": [
+              "fighters",
+              "stage",
+              "SETTINGS",
+              "AI_LEVEL",
+              "TESTMODE",
+              "chosen"
+            ]
+          },
+          {
+            "module": "src/data/roster.js",
+            "symbols": [
+              "ROSTER"
+            ]
+          },
+          {
+            "module": "src/ui/router.js",
+            "symbols": [
+              "go"
+            ]
+          }
+        ]
+      },
+      {
+        "path": "src/modes/arena.js",
+        "purpose": "Universal match orchestration hub: world/stage geometry (setupWorld+platform/spawn-zone helpers), match start (startMatch/beginMatchNow), recorder (RUN_REC), win resolution (checkWin/assignFinalPlacements), and test-mode (openTest/resetTest/testDps). setupWorld spans 2013-2149 (opens before slice) — move whole. Heavy fan-in; fighter<->arena and arena<->tournament/coop cycles (call-time).",
+        "exports": [
+          "startMatch",
+          "beginMatchNow",
+          "setupWorld",
+          "platRects",
+          "platRectsSmall",
+          "buildSpawnZones",
+          "spawnPlatRects",
+          "whoOn",
+          "updateSpawnZones",
+          "ffaRespawn",
+          "checkWin",
+          "assignFinalPlacements",
+          "startRunRecording",
+          "stopRunRecording",
+          "showRunReview",
+          "recorderSupported",
+          "openTest",
+          "resetTest",
+          "testDpsTick",
+          "testDpsText"
+        ],
+        "sourceRanges": [
+          "1254-1273",
+          "1726-1834",
+          "2013-2238",
+          "4658-4707",
+          "6182-6216"
+        ],
+        "importsFrom": [
+          {
+            "module": "src/core/state.js",
+            "symbols": [
+              "WW",
+              "WH",
+              "camX",
+              "camY",
+              "bases",
+              "worldPlats",
+              "worldZones",
+              "spawnZones",
+              "floors",
+              "fighters",
+              "stage",
+              "SETTINGS",
+              "TESTMODE",
+              "chosen",
+              "CUSTOM_LEVEL",
+              "W",
+              "H",
+              "LOCAL_PLAYERS",
+              "running",
+              "paused",
+              "hazardT",
+              "particles",
+              "projectiles",
+              "beams",
+              "items",
+              "summons",
+              "itemTimer",
+              "evil",
+              "lastKoFrame",
+              "BOSSRUSH",
+              "cv",
+              "TOURNEY",
+              "TOURNEY_WATCHING",
+              "elimSeq"
+            ]
+          },
+          {
+            "module": "src/core/constants.js",
+            "symbols": [
+              "CLAIM_FRAMES",
+              "TEAM_COLORS",
+              "MAX_TEAMS",
+              "MAX_FFA"
+            ]
+          },
+          {
+            "module": "src/data/roster.js",
+            "symbols": [
+              "ROSTER"
+            ]
+          },
+          {
+            "module": "src/data/stages.js",
+            "symbols": [
+              "STAGES"
+            ]
+          },
+          {
+            "module": "src/engine/physics.js",
+            "symbols": [
+              "isBig",
+              "isBigFFA",
+              "groundY",
+              "stageScale",
+              "clamp"
+            ]
+          },
+          {
+            "module": "src/engine/fighter.js",
+            "symbols": [
+              "buildFighters",
+              "loop"
+            ]
+          },
+          {
+            "module": "src/ui/router.js",
+            "symbols": [
+              "go"
+            ]
+          },
+          {
+            "module": "src/ui/hud.js",
+            "symbols": [
+              "banner",
+              "buildHUD",
+              "showResult"
+            ]
+          },
+          {
+            "module": "src/render/draw.js",
+            "symbols": [
+              "resize"
+            ]
+          },
+          {
+            "module": "src/audio/audio.js",
+            "symbols": [
+              "sndInit",
+              "startMusic",
+              "stopMusic",
+              "SFX"
+            ]
+          },
+          {
+            "module": "src/modes/tournament.js",
+            "symbols": [
+              "startTournament",
+              "finishWatchedGroup",
+              "finishWatchedKnockout",
+              "tourneyTeamSize"
+            ]
+          },
+          {
+            "module": "src/modes/boss-rush.js",
+            "symbols": [
+              "bossRushCheck"
+            ]
+          },
+          {
+            "module": "src/modes/coop-planning.js",
+            "symbols": [
+              "captureTeamPlan"
+            ]
+          },
+          {
+            "module": "src/ui/balance-stats.js",
+            "symbols": [
+              "recordMatch"
+            ]
+          }
+        ]
+      },
+      {
+        "path": "src/modes/tutorial.js",
+        "purpose": "Tutorial script + lifecycle + on-canvas prompt overlay. TUT_STEPS immutable. Calls loop() (fighter), setupWorld (arena), go (router). drawTutorialPrompt imported by draw.js.",
+        "exports": [
+          "openTutorial",
+          "startTutorial",
+          "tutorialTick",
+          "tutorialComplete",
+          "finishTutorial",
+          "drawTutorialPrompt",
+          "tutorialSeen",
+          "markTutorialSeen",
+          "TUT_STEPS"
+        ],
+        "sourceRanges": [
+          "1308-1387"
+        ],
+        "importsFrom": [
+          {
+            "module": "src/core/state.js",
+            "symbols": [
+              "TUT",
+              "SETTINGS",
+              "stage",
+              "chosen",
+              "fighters",
+              "running",
+              "paused",
+              "items",
+              "itemTimer",
+              "ctx",
+              "setStage",
+              "setChosen"
+            ]
+          },
+          {
+            "module": "src/data/roster.js",
+            "symbols": [
+              "ROSTER"
+            ]
+          },
+          {
+            "module": "src/data/stages.js",
+            "symbols": [
+              "STAGES"
+            ]
+          },
+          {
+            "module": "src/ui/router.js",
+            "symbols": [
+              "go"
+            ]
+          },
+          {
+            "module": "src/ui/hud.js",
+            "symbols": [
+              "buildHUD",
+              "banner"
+            ]
+          },
+          {
+            "module": "src/modes/arena.js",
+            "symbols": [
+              "setupWorld"
+            ]
+          },
+          {
+            "module": "src/engine/fighter.js",
+            "symbols": [
+              "buildFighters",
+              "loop"
+            ]
+          },
+          {
+            "module": "src/engine/physics.js",
+            "symbols": [
+              "groundY"
+            ]
+          },
+          {
+            "module": "src/audio/audio.js",
+            "symbols": [
+              "sndInit",
+              "startMusic",
+              "SFX"
+            ]
+          }
+        ]
+      },
+      {
+        "path": "src/modes/tournament.js",
+        "purpose": "World Cup: setup, 48-team group stage sim, knockout bracket, hub rendering + watch-fixture live play. tourneyLiveTick called by step; finishWatched* called by checkWin; startTournament called by startMatch. f.stocks=Infinity in group matches — preserve HUD/sort Infinity guards.",
+        "exports": [
+          "openTournamentSetup",
+          "kickOffTournament",
+          "startTournament",
+          "showTourneyHub",
+          "watchFixture",
+          "finishWatchSetup",
+          "tourneyLiveTick",
+          "finishWatchedGroup",
+          "finishWatchedKnockout",
+          "endTournament",
+          "simRestOfRound",
+          "proceedAfterRound",
+          "buildGroupFixtures",
+          "tourneyTeamSize",
+          "teamName",
+          "seedKnockout",
+          "advanceKnockout"
+        ],
+        "sourceRanges": [
+          "1301-1442",
+          "1444-1721"
+        ],
+        "importsFrom": [
+          {
+            "module": "src/core/state.js",
+            "symbols": [
+              "TOURNEY",
+              "TOURNEY_MATCH_ACTIVE",
+              "TOURNEY_WATCHING",
+              "TOURNEY_SETUP_SIZE",
+              "TOURNEY_SETUP_MODE",
+              "PENDING_TOURNEY",
+              "SETTINGS",
+              "stage",
+              "fighters",
+              "running",
+              "paused",
+              "hazardT",
+              "particles",
+              "projectiles",
+              "beams",
+              "evil",
+              "items",
+              "summons",
+              "itemTimer",
+              "tendrils",
+              "BOSS_ARENA",
+              "camX",
+              "camY",
+              "chosen",
+              "elimSeq",
+              "setStage"
+            ]
+          },
+          {
+            "module": "src/core/constants.js",
+            "symbols": [
+              "TOURNEY_TIME_LIMIT"
+            ]
+          },
+          {
+            "module": "src/data/roster.js",
+            "symbols": [
+              "ROSTER"
+            ]
+          },
+          {
+            "module": "src/data/stages.js",
+            "symbols": [
+              "STAGES"
+            ]
+          },
+          {
+            "module": "src/ui/router.js",
+            "symbols": [
+              "go"
+            ]
+          },
+          {
+            "module": "src/ui/hud.js",
+            "symbols": [
+              "banner",
+              "buildHUD"
+            ]
+          },
+          {
+            "module": "src/render/draw.js",
+            "symbols": [
+              "resize"
+            ]
+          },
+          {
+            "module": "src/modes/arena.js",
+            "symbols": [
+              "setupWorld"
+            ]
+          },
+          {
+            "module": "src/engine/fighter.js",
+            "symbols": [
+              "buildFighters",
+              "loop"
+            ]
+          }
+        ]
+      },
+      {
+        "path": "src/modes/boss-rush.js",
+        "purpose": "Boss Rush gauntlet: start, per-boss spawn (HP scaled by living fighters), per-frame win/lose check. bossRushCheck called by step; routes to showResult on defeat.",
+        "exports": [
+          "startBossRush",
+          "spawnBossRushBoss",
+          "bossRushCheck"
+        ],
+        "sourceRanges": [
+          "1777-1834"
+        ],
+        "importsFrom": [
+          {
+            "module": "src/core/state.js",
+            "symbols": [
+              "BOSSRUSH",
+              "BOSS_ARENA",
+              "stage",
+              "fighters",
+              "summons",
+              "SETTINGS",
+              "running",
+              "lastKoFrame",
+              "setStage"
+            ]
+          },
+          {
+            "module": "src/data/roster.js",
+            "symbols": [
+              "BOSS_ROSTER"
+            ]
+          },
+          {
+            "module": "src/data/stages.js",
+            "symbols": [
+              "STAGES"
+            ]
+          },
+          {
+            "module": "src/engine/physics.js",
+            "symbols": [
+              "groundY"
+            ]
+          },
+          {
+            "module": "src/ui/hud.js",
+            "symbols": [
+              "banner",
+              "showResult"
+            ]
+          },
+          {
+            "module": "src/audio/audio.js",
+            "symbols": [
+              "startMusic",
+              "SFX"
+            ]
+          }
+        ]
+      },
+      {
+        "path": "src/modes/coop-planning.js",
+        "purpose": "Team strategy chat panel + LLM plan (module-local PLAN_KEY, never persisted). refreshTeamChat previews rosters via setupWorld/buildFighters (mutates live match state — preserve or refactor). planLLM hits api.anthropic.com directly (CORS/auth best-effort). Writes window.__planMyTeam.",
+        "exports": [
+          "captureTeamPlan",
+          "syncTeamKey",
+          "saveHomeKey",
+          "clearHomeKey",
+          "refreshTeamChat",
+          "toggleTeamChat",
+          "planSetKey",
+          "planSend",
+          "setStanceUI",
+          "planMate",
+          "planMe"
+        ],
+        "sourceRanges": [
+          "1274-1294",
+          "1863-2004"
+        ],
+        "importsFrom": [
+          {
+            "module": "src/core/state.js",
+            "symbols": [
+              "TEAM_PLAN",
+              "SETTINGS",
+              "fighters",
+              "stage"
+            ]
+          },
+          {
+            "module": "src/modes/arena.js",
+            "symbols": [
+              "setupWorld"
+            ]
+          },
+          {
+            "module": "src/engine/fighter.js",
+            "symbols": [
+              "buildFighters"
+            ]
+          },
+          {
+            "module": "src/render/draw.js",
+            "symbols": [
+              "resize"
+            ]
+          }
+        ]
+      },
+      {
+        "path": "src/net/netcode.js",
+        "purpose": "WebSocket LAN relay singleton NET (kept assigned to window.NET so the sim loop + buildFighters read it without an import cycle). serializeState/applySnapshot (client REASSIGNS render pools → must use state setters). autoJoinFromLink + openLobby. NET.connect reads chosen.",
+        "exports": [
+          "NET",
+          "serializeState",
+          "applySnapshot",
+          "autoJoinFromLink",
+          "openLobby"
+        ],
+        "sourceRanges": [
+          "5951-6216"
+        ],
+        "importsFrom": [
+          {
+            "module": "src/core/state.js",
+            "symbols": [
+              "hazardT",
+              "WW",
+              "WH",
+              "camX",
+              "camY",
+              "W",
+              "H",
+              "stage",
+              "floors",
+              "worldPlats",
+              "bases",
+              "SETTINGS",
+              "fighters",
+              "projectiles",
+              "beams",
+              "particles",
+              "running",
+              "TESTMODE",
+              "down",
+              "KEYS",
+              "chosen",
+              "setStage"
+            ]
+          },
+          {
+            "module": "src/data/stages.js",
+            "symbols": [
+              "STAGES"
+            ]
+          },
+          {
+            "module": "src/ui/hud.js",
+            "symbols": [
+              "banner"
+            ]
+          },
+          {
+            "module": "src/ui/router.js",
+            "symbols": [
+              "go"
+            ]
+          },
+          {
+            "module": "src/engine/physics.js",
+            "symbols": [
+              "clamp"
+            ]
+          },
+          {
+            "module": "src/engine/fighter.js",
+            "symbols": [
+              "buildFighters"
+            ]
+          },
+          {
+            "module": "src/modes/arena.js",
+            "symbols": [
+              "startMatch"
+            ]
+          }
+        ]
+      },
+      {
+        "path": "src/editor/level-editor.js",
+        "purpose": "Level creator (ED working state, canvas tools, zone/plat editing, save/load via BStore) + playCustomLevel bridge to match. Duplicate sky-gradient literal at edDraw+playCustomLevel — hoist to shared stage/hazard constants. Uses blocking alert/confirm (note for Electron).",
+        "exports": [
+          "openEditor",
+          "edRotateSel",
+          "edSetStrength",
+          "edSave",
+          "edTestPlay",
+          "edClear",
+          "edLoad",
+          "edRenderList",
+          "playCustomLevel",
+          "edCurrentLevel",
+          "ZONE_TYPES"
+        ],
+        "sourceRanges": [
+          "6227-6453"
+        ],
+        "importsFrom": [
+          {
+            "module": "src/core/state.js",
+            "symbols": [
+              "CUSTOM_LEVEL",
+              "stage",
+              "SETTINGS",
+              "TESTMODE",
+              "PENDING_CUSTOM",
+              "setStage",
+              "setCustomLevel"
+            ]
+          },
+          {
+            "module": "src/ui/balance-stats.js",
+            "symbols": [
+              "BStore"
+            ]
+          },
+          {
+            "module": "src/ui/router.js",
+            "symbols": [
+              "go"
+            ]
+          },
+          {
+            "module": "src/modes/arena.js",
+            "symbols": [
+              "startMatch"
+            ]
+          }
+        ]
+      },
+      {
+        "path": "src/ui/global-actions.js",
+        "purpose": "Single central place that assigns every inline-HTML on*= handler (and NET/TESTMODE) to window, imported for side effect by main.js AFTER all handler-owning modules load. Without this the DOM's onclick attributes throw ReferenceError under ESM scoping.",
+        "exports": [],
+        "sourceRanges": [],
+        "importsFrom": [
+          {
+            "module": "src/ui/router.js",
+            "symbols": [
+              "go"
+            ]
+          },
+          {
+            "module": "src/audio/audio.js",
+            "symbols": [
+              "toggleSound"
+            ]
+          },
+          {
+            "module": "src/modes/tutorial.js",
+            "symbols": [
+              "openTutorial",
+              "startTutorial",
+              "finishTutorial",
+              "tutorialSeen"
+            ]
+          },
+          {
+            "module": "src/modes/tournament.js",
+            "symbols": [
+              "openTournamentSetup",
+              "kickOffTournament",
+              "endTournament",
+              "simRestOfRound"
+            ]
+          },
+          {
+            "module": "src/modes/arena.js",
+            "symbols": [
+              "startMatch",
+              "openTest",
+              "resetTest"
+            ]
+          },
+          {
+            "module": "src/modes/coop-planning.js",
+            "symbols": [
+              "toggleTeamChat",
+              "syncTeamKey",
+              "saveHomeKey",
+              "clearHomeKey",
+              "planSetKey",
+              "planSend"
+            ]
+          },
+          {
+            "module": "src/net/netcode.js",
+            "symbols": [
+              "openLobby",
+              "NET"
+            ]
+          },
+          {
+            "module": "src/editor/level-editor.js",
+            "symbols": [
+              "openEditor",
+              "edRotateSel",
+              "edSetStrength",
+              "edSave",
+              "edTestPlay",
+              "edClear"
+            ]
+          },
+          {
+            "module": "src/ui/balance-stats.js",
+            "symbols": [
+              "openStats",
+              "exportStats",
+              "resetStats"
+            ]
+          },
+          {
+            "module": "src/ui/controls-remap.js",
+            "symbols": [
+              "resetKeys"
+            ]
+          },
+          {
+            "module": "src/core/state.js",
+            "symbols": [
+              "TESTMODE"
+            ]
+          }
+        ]
+      },
+      {
+        "path": "src/main.js",
+        "purpose": "Boot/wiring only. On DOMContentLoaded: state.initDom() (resolve cv/ctx), import global-actions (window bridge), register window listeners (keydown/keyup→captureRemapKey+game input, resize→draw.resize when running, pointerdown/keydown/touchstart→audio unlock), then buildBoard() and autoJoinFromLink(). Kicks nothing until the user acts; the first loop() is started by a mode starter.",
+        "exports": [],
+        "sourceRanges": [
+          "1007-1009",
+          "1208-1253",
+          "6509-6510"
+        ],
+        "importsFrom": [
+          {
+            "module": "src/core/state.js",
+            "symbols": [
+              "initDom",
+              "running",
+              "paused",
+              "down",
+              "KEYS"
+            ]
+          },
+          {
+            "module": "src/ui/global-actions.js",
+            "symbols": []
+          },
+          {
+            "module": "src/ui/roster-screen.js",
+            "symbols": [
+              "buildBoard"
+            ]
+          },
+          {
+            "module": "src/net/netcode.js",
+            "symbols": [
+              "autoJoinFromLink"
+            ]
+          },
+          {
+            "module": "src/render/draw.js",
+            "symbols": [
+              "resize"
+            ]
+          },
+          {
+            "module": "src/ui/controls-remap.js",
+            "symbols": [
+              "captureRemapKey",
+              "isListening"
+            ]
+          },
+          {
+            "module": "src/audio/audio.js",
+            "symbols": [
+              "sndInit",
+              "sndResume"
+            ]
+          },
+          {
+            "module": "src/engine/fighter.js",
+            "symbols": [
+              "loop"
+            ]
+          },
+          {
+            "module": "src/modes/coop-planning.js",
+            "symbols": [
+              "planSend"
+            ]
+          }
+        ]
+      }
+    ],
+    "globalHandlerBridge": [
+      "go",
+      "toggleSound",
+      "openTutorial",
+      "startTutorial",
+      "finishTutorial",
+      "tutorialSeen",
+      "openLobby",
+      "openTest",
+      "resetTest",
+      "openTournamentSetup",
+      "kickOffTournament",
+      "endTournament",
+      "simRestOfRound",
+      "openEditor",
+      "edRotateSel",
+      "edSetStrength",
+      "edSave",
+      "edTestPlay",
+      "edClear",
+      "openStats",
+      "exportStats",
+      "resetStats",
+      "toggleTeamChat",
+      "syncTeamKey",
+      "saveHomeKey",
+      "clearHomeKey",
+      "planSetKey",
+      "planSend",
+      "startMatch",
+      "resetKeys",
+      "NET",
+      "TESTMODE"
+    ],
+    "initOrder": [
+      "1. index.html loads styles/tokens.css then styles/app.css (token :root vars first) and the DOM shell (all domIds present) before any script module evaluates.",
+      "2. src/core/constants.js (leaf, eager — clears TDZ for GRAV/FREEZE_MAX/etc.).",
+      "3. src/data/roster.js, src/data/stages.js (leaves; needed by state init).",
+      "4. src/core/state.js — evaluates chosen=ROSTER.find(play), stage=STAGES[0], KEYS from DEFAULT_KEYS. NO cv/ctx yet (deferred to initDom).",
+      "5. src/data/smashes.js (its engine deps are call-time only, safe to load here).",
+      "6. src/audio/audio.js (self-contained; unlock listeners NOT registered yet).",
+      "7. src/engine/particles.js, src/engine/physics.js (near-leaves: import only state/constants).",
+      "8. src/engine/hit.js, combat.js, boss.js, attacks.js, specials.js, then fighter.js (loop/step). Order within this group is not load-critical — all cross-refs are call-time, none execute at module top level.",
+      "9. src/ai/ai.js.",
+      "10. src/render/draw.js.",
+      "11. src/ui/hud.js, router.js, roster-screen.js, controls-remap.js, balance-stats.js.",
+      "12. src/modes/arena.js, tournament.js, boss-rush.js, tutorial.js, coop-planning.js.",
+      "13. src/net/netcode.js — executes `window.NET = NET` at import (import-time side effect; safe, no DOM needed).",
+      "14. src/editor/level-editor.js.",
+      "15. src/ui/global-actions.js — assigns all bridged handlers + NET + TESTMODE to window (AFTER every owning module is loaded).",
+      "16. src/main.js boot on DOMContentLoaded: state.initDom() resolves cv/ctx → register keydown/keyup/resize/pointer(audio-unlock) listeners → buildBoard() → autoJoinFromLink(). First loop() is triggered later by a mode starter (startMatch/beginMatchNow/startTutorial/startBossRush/watchFixture), never at import."
+    ],
+    "circularDeps": [
+      "GENERAL PRINCIPLE (applies to all cycles below): every listed cross-reference is invoked at CALL time, never during module top-level evaluation, and all mutable shared state is centralized in core/state.js (no re-exported `let` bindings). Under ESM's live-binding + single-evaluation semantics these cycles are therefore non-fatal. The invariant to preserve: no module may CALL an imported function during its own module evaluation, and no module may reassign an imported binding (use state setters).",
+      "render/draw.js <-> engine/hit.js AND render/draw.js <-> engine/boss.js: shake() sat in draw.js while hit/boss need it every hit. BREAK (structural, done in this map): move shake()+shakeAmt into core/state.js. Now hit/boss import shake from the leaf state module and never import draw.",
+      "engine/fighter.js <-> modes/arena.js: fighter.step calls platRects/checkWin/updateSpawnZones (arena); arena imports buildFighters+loop (fighter). BREAK: call-time only. Optional cleanup — relocate platRects to engine/physics.js and checkWin to a small modes/match module to make it acyclic.",
+      "modes/arena.js <-> modes/tournament.js: startMatch→startTournament and checkWin→finishWatched*; tournament→setupWorld+loop. BREAK: call-time only (a shared engine/world module for setupWorld would fully remove it).",
+      "modes/arena.js <-> modes/coop-planning.js: startMatch→captureTeamPlan; refreshTeamChat→setupWorld+buildFighters. BREAK: call-time only.",
+      "ui/hud.js <-> modes/arena.js: showResult→stopRunRecording/showRunReview; arena→banner/buildHUD/showResult. BREAK: call-time; or extract banner into a tiny ui/banner leaf since it is the most widely imported symbol.",
+      "ui/router.js <-> {roster-screen, controls-remap, arena}: go() rebuilds board/maps and cancels loop; those modules import go. BREAK: call-time; go references resolve lazily.",
+      "engine/attacks.js <-> data/smashes.js: doSmash imports SMASHES; SMASHES methods import comebackFlavor + engine helpers. BREAK: call-time only. If a hard-acyclic graph is required, house SMASHES in an engine module instead of data/ (contradicts the fixed layout) OR move comeback* helpers to a leaf.",
+      "engine/hit.js <-> engine/attacks.js: applyHit calls comeback* + hitCircle; attacks.doAttack/doSmash call applyHit/hitCircle. BREAK: call-time; co-located recursive core (applyHit/hitCircle/damageSummons) stays inside hit.js.",
+      "engine/hit.js <-> engine/boss.js: applyHit→bossDmg/freeFromStomach; boss.updateSummons→applyHit. BREAK: call-time.",
+      "engine/combat.js <-> engine/boss.js: updateItems→updateSummons; summon act-switch→spawnProj/dropProj. BREAK: call-time.",
+      "net/netcode.js <-> engine/fighter.js: loop→applySnapshot; NET.beginMatch/finishWatch→buildFighters/startMatch. BREAK: keep NET on window.NET for the loop's role dispatch (already assigned at import), and treat applySnapshot as a call-time import — no top-level use."
+    ],
+    "unassigned": [
+      "loop() and step(): the catalog gave conflicting homes (loop→main.js in slice 2417-2741; step→main.js in slice 2741-3091 but →fighter.js in slice 3091-3549). RESOLVED to engine/fighter.js for BOTH, deliberately overriding the main.js suggestion, so mode starters can call loop() without a modes→entry(main) import cycle. main.js only boots.",
+      "shake(): catalog placed it in render/draw.js; RELOCATED to core/state.js (beside shakeAmt) to break render<->hit/boss cycles. Flagged because it deviates from the catalog's proposedModule.",
+      "BOSS_ATK_ID: conflicting guidance (one slice says state.js, another says keep in boss.js). RESOLVED to module-local `let` in engine/boss.js since BOTH increment sites live in boss.js; projectiles carry pr._atk snapshots, so no other module reassigns it. Revisit only if an increment ever moves out of boss.js.",
+      "RANGE_PROFILE: symbol catalog says engine/attacks.js, but roster-screen's refreshSel risk note says import it from data/smashes.js. RESOLVED to attacks.js; roster-screen imports RANGE_PROFILE from attacks.js (a ui→engine read-only import). If that coupling is undesirable, duplicate the reach table into data/.",
+      "clamp / shuffle / feetY: generic utils with no util module in the target layout. Parked: clamp+feetY→engine/physics.js, shuffle→engine/fighter.js. A dedicated src/core/util.js would be cleaner (clamp is imported by ~8 modules).",
+      "pollPad: input polling placed in ui/controls-remap.js per layout, but it is consumed by engine/fighter.step — an engine→ui import that inverts normal layering. A src/input/ module would be the natural home.",
+      "BStore: storage abstraction placed in ui/balance-stats.js per catalog, but also imported by editor/level-editor.js. Candidate for its own src/core/storage.js leaf. In Electron window.storage is absent — must fall back to localStorage or an Electron store.",
+      "buildFighters: assigned to engine/fighter.js but is really match-lineup bootstrap heavily coupled to SETTINGS/TESTMODE/netcode(window.__netRoster/window.NET)/team math. A src/modes/match-setup.js could be a better home than the engine layer.",
+      "playCustomLevel: straddles editor and match-setup (mutates stage/SETTINGS/TESTMODE/CUSTOM_LEVEL then calls startMatch or sets PENDING_CUSTOM). Kept in editor/level-editor.js for cohesion with edTestPlay/edLoad; could equally live in modes/arena.js.",
+      "updateSummons: straddles boss dispatch (type==='boss'→updateBossAttack) and the large non-boss item/assist behavior switch. Kept in engine/boss.js because the layout has no engine/summons.js; a dedicated summons module would be cleaner.",
+      "RUN_REC / recorder subsystem (recorderSupported/startRunRecording/stopRunRecording/showRunReview): cohesive unit with no bucket in the layout; parked in modes/arena.js. showRunReview is really result-screen UI (candidate for ui/hud.js) — splitting it from capture would fragment the unit.",
+      "window side-channels __p2Taken, __netRoster, __netHumanCount, __lastBanner, __loopErrLogged, __planMyTeam: left on window as the netcode/buildFighters/banner-relay bridge (only __elimSeq was migrated to state.elimSeq). Decide per-channel whether to migrate to core/state.js; kept on window to avoid extra netcode<->fighter import coupling.",
+      "SND: mutable audio singleton kept inside src/audio/audio.js (not core/state.js) because only audio fns touch it and the module is being rebuilt; consumers use the SFX/startMusic/stopMusic interface, not SND directly."
+    ],
+    "risks": [
+      {
+        "title": "Inline on*= handlers resolve against module scope (or are killed by CSP) — dead buttons across the whole UI",
+        "severity": "critical",
+        "detail": "index.html has 44 inline on*= handlers (onclick=\"startMatch()\", onchange=\"TESTMODE.damage=this.value\", onclick=\"NET.host()\", etc.). ESM module scope is NOT global, so every handler resolves against window.* and throws ReferenceError unless global-actions.js has assigned that exact symbol to window. Two concrete failure modes: (1) COVERAGE GAP — globalHandlerBridge lists only 32 names but the design says 44 inline handlers exist, so ~12 handlers (and any that pass args/reference event/this, or read NET/TESTMODE object props) may be unbridged -> silent dead controls. (2) FAIL-FAST CASCADE — global-actions.js assigns handlers sequentially; if ANY handler-owning module failed to load or a symbol is undefined at assignment time, the throw aborts the rest of global-actions and every later button dies at once. (3) ELECTRON CSP — a packaged app with a strict script-src (no unsafe-inline/unsafe-hashes) blocks inline event-handler execution entirely, so ALL 44 handlers become no-ops even when the window bridge is perfect.",
+        "mitigation": "Auto-generate the bridge from the DOM: at boot, querySelectorAll('[onclick],[onchange],[oninput],...]'), parse every referenced identifier, and assert each exists on window BEFORE first paint — fail loudly (throw a visible boot error) if any is missing, so a 32-vs-44 gap is impossible to ship. Wrap each window assignment in global-actions in its own try/catch so one bad symbol can't cascade. For Electron, either ship a CSP that permits inline handlers (script-src 'unsafe-inline' is required for on*=) OR — better long-term — replace inline handlers with addEventListener delegation keyed on data-action attributes, which is CSP-safe and removes the window bridge entirely."
+      },
+      {
+        "title": "Shared-state aliasing: modules read/reassign a value COPY instead of the live core/state.js singleton",
+        "severity": "critical",
+        "detail": "This is the pervasive ESM trap in this split. Imported bindings are live but READ-ONLY. Two failure classes: (1) REASSIGNING AN IMPORT throws 'Assignment to constant variable' — every reassignment site for running/paused/raf/camX/camY/W/H/WW/WH/stage/chosen/KEYS/hazardT/elimSeq and the wholesale array swaps (fighters=..., particles=filter(...), projectiles/beams/items/summons/tendrils/worldPlats/floors=...) must go through a setter or mutate state.<field>. Miss one and it's a build/runtime crash. (2) SILENT SNAPSHOT — a module that does const {hazardT}=state or let f=fighters at top level captures the primitive/array reference at eval time; when state reassigns fighters wholesale (buildFighters/applySnapshot) or increments hazardT, the module keeps operating on the stale copy. A frozen hazardT is the nastiest: draw/HUD/ai/hit all key timing off it, so freeze-cap (45f), curse decay (1.5s), KO timing (lastKoFrame=hazardT) and item timers all quietly stop while the game still 'runs'. Object singletons (SETTINGS/TESTMODE/BOSSRUSH/TUT/STOMACH/down/KEYS) must be mutated in place — re-exporting SETTINGS.foo as a primitive elsewhere breaks the same way.",
+        "mitigation": "Never export a bare reassignable primitive/array for external WRITE — expose setters (setStage/setChosen/setKeys/setRunning/setCamX...) and object fields (state.hazardT, state.camX) as the map already mandates, and enforce it: ESLint no-param-reassign + a custom rule banning reassignment of imported bindings, plus grep for `const {` / `let x = ` destructuring of primitive state exports (ban destructuring of state primitives — always read state.hazardT at the point of use). Convert hazardT/camX/camY/W/H/elimSeq to object fields so ++ and += work. Prod bundle in strict mode surfaces reassignment-of-import at build time — treat any such error as a blocker, not a warning."
+      },
+      {
+        "title": "Infinity/RangeError render-loop bug resurrected by the HUD/tournament split (the named six-build bug)",
+        "severity": "critical",
+        "detail": "Confirmed from the balance log: World Cup group matches set f.stocks=Infinity; HUD did '●'.repeat(f.stocks) -> RangeError every frame -> the throw escapes the RAF callback -> the browser stops scheduling frames -> black screen. It took six builds because the harness stubbed updateHUD, so the guard path was never exercised. The split REVIVES this three ways: (a) the ∞-render guard lives in updateHUD (now hud.js) and the Infinity-safe standings SORT lives in tournament.js — splitting build/update/standings risks the guard landing on the wrong side or being dropped; (b) any new .repeat/.toFixed/new Array(f.stocks)/String(f.stocks) on an Infinity stock count anywhere in the moved code re-throws; (c) if loop() in fighter.js does not contain draw()+updateHUD() in a try/catch, a single thrown frame silently kills the loop with no further RAF — the exact dead-screen signature.",
+        "mitigation": "Keep the Infinity guards co-located with the values they guard: render ∞ for non-finite stocks inside updateHUD, and make standings sort tolerate Infinity in hud.js (or a shared placement helper) — never in a caller. Add a loud dev-mode assertion in updateHUD that throws a NAMED error if it ever receives a raw Infinity it doesn't special-case. Wrap the loop body (step/draw/updateHUD) in try/catch that logs ONCE (the existing __loopErrLogged one-shot) AND, critically, keeps the page from silently freezing — in dev, rethrow to a visible overlay; in prod, cancel cleanly and surface an error banner rather than a black screen. Above all: the World Cup infinite-stock path must be in the automated behavioral suite with the REAL HUD — never stubbed (see verification checks)."
+      },
+      {
+        "title": "Import-time side effects touch canvas/AudioContext/DOM before they exist",
+        "severity": "critical",
+        "detail": "cv/ctx are lazy (initDom on DOMContentLoaded), and audio must not create an AudioContext until a user gesture. Any module that at TOP LEVEL touches ctx/cv (draw.js imports both), calls resize(), does new AudioContext() (audio.js), opens a WebSocket (netcode constructing NET), reads window.storage (balance-stats BStore), or hits api.anthropic.com (coop-planning) will either crash at load (ctx undefined) or produce a permanently-suspended/blocked resource. A wholesale slice move can easily drag a stray top-level call (an IIFE, a trailing someInit() at the bottom of a merged range) into module-eval time.",
+        "mitigation": "Assert the invariant mechanically: module evaluation must have ZERO DOM/canvas/audio/network effects. draw.js may import ctx/cv but must only dereference them inside draw()/resize(). audio.js creates the context only in sndInit()/sndResume(), guarded by SND.ctx===null, invoked from the first gesture in main.js — never at import. netcode.js may do window.NET=NET at import but NET must open its socket only on connect(). BStore must compute window.storage||localStorage inside its methods, not at module top, and guard for absence. Add a boot check: load all modules with the DOM present but before initDom, and assert no canvas/audio/network activity occurred (spy on getContext/AudioContext/WebSocket)."
+      },
+      {
+        "title": "ESM strict-mode turns former implicit globals into hard ReferenceErrors",
+        "severity": "high",
+        "detail": "The monolith is one non-strict script, so bare assignments created globals. ESM modules are ALWAYS strict. The map flags lastKoFrame=hazardT in eliminate ('strict-mode implicit-global hazard') and TEAM_PLAN ('assigned as implicit global today'); the window side-channels (__p2Taken/__netRoster/__netHumanCount/__lastBanner/__planMyTeam) were also bare assignments. Under strict mode, assigning an undeclared identifier throws ReferenceError at the moment eliminate/beginMatchNow/AI runs — mid-match crash. Also: top-level `this` is undefined in a module (was window in the script), so any this.foo that meant window.foo now throws.",
+        "mitigation": "Declare and export every former implicit global from core/state.js (lastKoFrame, TEAM_PLAN, elimSeq already migrated) and write them via setters. Grep the moved code for assignments to identifiers that were never declared with let/const/var in-scope, and for top-level `this.`. Keep genuine window side-channels as explicit window.__x = ... assignments (window is defined), and decide per-channel whether to migrate into state; do not leave any bare (unqualified) assignment."
+      },
+      {
+        "title": "Circular-import graph yields undefined-at-init if any module calls a cyclic import during top-level evaluation",
+        "severity": "high",
+        "detail": "The engine cluster (hit<->boss<->combat<->attacks<->specials<->fighter) and the modes/ui cycles are declared 'call-time safe' — TRUE under ESM live-binding ONLY IF no module invokes an imported function while it is still being evaluated. The map ASSERTS this ('none execute at module top level'); adversarially, that must be PROVEN per module, because a single top-level invocation reintroduces the failure. Prime suspects: RANGE_PROFILE/RANGED_ATTACKERS tables built in attacks.js, DASH_KITS/UPSPECIALS/DOWNSPECIALS/ATKSPECIALS dispatch tables in specials.js, and SMASHES in data/smashes.js (data importing engine) — if any entry is constructed by CALLING an imported engine helper at table-definition time (rather than referencing it inside a method body), that import is undefined at init and you get 'x is not a function' at load, order-dependent and flaky.",
+        "mitigation": "Enforce the invariant: dispatch/data tables may reference imported functions inside method bodies but must not CALL them at definition time. Add a smoke check that after full module load (before any gesture), a representative function from each cycle is `typeof === 'function'`. Prefer stable import order (constants -> data -> state -> leaves -> engine) but do not RELY on order for correctness — the point is that no cross-cyclic call happens at eval time. Consider extracting the most-imported leaves (banner, clamp, shake — shake already moved to state) to shrink the cycles."
+      },
+      {
+        "title": "Electron packaged build diverges from Vite dev: CSP, file:// storage, and remote fonts",
+        "severity": "high",
+        "detail": "Several things work in `vite dev` (http://localhost, permissive) but break in the packaged Electron renderer: (1) a strict CSP blocks inline on*= handlers (intersects the critical handler risk) and blocks the remote @import of Fredoka/JetBrains fonts (map flags -> must bundle @fontsource). (2) If the app loads over file:// (null origin), localStorage can throw SecurityError -> BStore crashes on level save/stats, and the map already notes window.storage is absent in the Electron renderer. (3) contextIsolation itself does NOT break the game's own window.NET/window.TESTMODE bridge (page code and inline handlers share the same page window), but if window.storage was previously injected by a non-isolated preload, enabling isolation removes it and BStore must fall back cleanly.",
+        "mitigation": "Run the full behavioral suite inside the PACKAGED Electron build, not just dev. Bundle fonts via @fontsource (no network). Ship a CSP that permits inline handlers if you keep them (or migrate to data-action delegation to be CSP-clean). Load the renderer from a real origin (custom app:// protocol or http://localhost) so localStorage works, and make BStore guard localStorage access in a try/catch with an in-memory fallback so save/load never hard-crashes."
+      },
+      {
+        "title": "AudioContext autoplay-unlock race: music started by a mode before the gesture unlocks the context",
+        "severity": "high",
+        "detail": "Browsers create AudioContext in 'suspended' state until a user gesture resumes it. Unlock listeners (pointerdown/keydown/touchstart) are registered in main.js boot. The race: a mode starter is itself triggered by a click, and it calls startMusic (arena/tutorial/boss-rush import startMusic). If sndInit+sndResume from the unlock listener has not run by the time startMusic fires on that same gesture, music plays into a suspended context (silence), and audio may later blast when the context resumes. If the unlock listener is {once:true} on a target the gesture doesn't bubble to (e.g. canvas with stopPropagation), it never unlocks at all.",
+        "mitigation": "Make sndInit()+sndResume() idempotent and call them at the TOP of every mode starter (and in the global unlock listener), so the first gesture always unlocks before any startMusic on that same gesture. Register unlock listeners on window/document in the capture phase, not {once:true} on a narrow element, and re-resume on visibilitychange. Guard startMusic to no-op (not queue) while SND.ctx.state!=='running'. Verify SND.ctx===null at page load (no context before gesture)."
+      },
+      {
+        "title": "Function bodies reassembled from non-contiguous source ranges lose a slice or a co-located helper",
+        "severity": "high",
+        "detail": "Several large functions are slice-cut across ranges: applyHit (4463-4560, plus co-located hitCircle/damageSummons), step (3076-3548), setupWorld (opens 2013 before its slice), loop, doSpecial's big switch. Wholesale range extraction can drop a mid-function slice or separate a helper that was defined adjacent and called by the function, producing 'x is not defined' only when that code path runs (e.g. a specific boss attack, a specific KO branch) — exactly the kind of bug that survives a shallow smoke test.",
+        "mitigation": "Extract by AST/function boundary, not by line range — reunite each function whole as the map instructs ('keep whole', 'reunite'). After each extraction, diff the set of top-level function/const names against the monolith to prove none vanished, and run a match that exercises every mode, every boss phase, and KO/eliminate paths so slice-drop surfaces as a thrown call, not a silent gap."
+      },
+      {
+        "title": "Reserved-word string keys in specials.js dispatch tables mangled by the minifier",
+        "severity": "medium",
+        "detail": "specials.js dispatch objects use reserved words as keys ('switch','static', keyed by kit.special). If the bundler/minifier is configured to mangle or quote-optimize property keys, the string keys the runtime looks up (from data) no longer match the object keys, so doSpecial silently dispatches nothing for those kits — a subset of fighters lose their special with no error.",
+        "mitigation": "Keep keys as quoted string literals and disable property-name mangling for these modules (Terser keep_quoted_props / mangle.properties off). Add a test that iterates ROSTER kits and asserts every kit.special resolves to a function in the dispatch tables."
+      },
+      {
+        "title": "Setters missed for pool reassignments done via .filter() every frame",
+        "severity": "medium",
+        "detail": "particles/projectiles/beams/items/summons/tendrils/worldPlats are reassigned wholesale via filter in step/updateItems/updateSummons/updateTendrils and cleared by summons/Eraser. Each is an imported binding; `particles = particles.filter(...)` on an import throws, and the naive fix of mutating a stale local reference breaks live sharing (draw.js reads the pool). These run every frame, so a missed one is an immediate per-frame crash or a pool that draw() never sees updated.",
+        "mitigation": "Provide in-place mutators or setters (state.setParticles(arr) or splice-in-place helpers) for every pool, and route ALL filter-reassignments through them. Prefer in-place mutation (arr.length=0 + push, or filter-into-same-array) so every importer keeps seeing the live array. Test: spawn particles/projectiles, run step, confirm draw renders the post-filter set."
+      },
+      {
+        "title": "DOM id and .screen/.active CSS<->JS contract broken during index.html extraction",
+        "severity": "medium",
+        "detail": "go() switches active .screen by class, HUD/board builders getElementById specific ids, and #hud.active gates the loop's HUD draw. If the index.html split renames, drops, or reorders any domId or the .screen/.screen.active/#hud.active class contract, getElementById returns null -> buildHUD/buildBoard/go throw or silently mis-render, and screens fail to show/hide.",
+        "mitigation": "Extract index.html verbatim — preserve every id and class. Add a boot assertion that every id referenced by getElementById in JS exists in the DOM (generate the id list, check presence, fail loudly). Snapshot-test screen transitions: fire go() for each screen id and assert exactly one .screen.active."
+      },
+      {
+        "title": "Test harness stubbing HUD/draw hides the very bug class the split endangers",
+        "severity": "medium",
+        "detail": "The six-build bug hid because the harness stubbed updateHUD. The design keeps the same testing surface; if the post-split harness continues to stub HUD/draw/audio to 'run headless', the Infinity-render, snapshot-aliasing, and slice-drop bugs all pass tests and ship. This is a process risk that directly caused the historical failure.",
+        "mitigation": "Ban stubbing of updateHUD/buildHUD/draw/updateStandings in the harness — run the REAL render and HUD against a real (or jsdom/offscreen) canvas, exactly as the v63 harness note intends ('runs the REAL HUD and draw, so the repeat(Infinity) class fails loudly'). Any test that needs to skip rendering must assert WHY and must not be the only coverage of a mode."
+      },
+      {
+        "title": "CSS token layer load order not guaranteed by the bundler",
+        "severity": "low",
+        "detail": "tokens.css (:root --grass/--host/--gold/--panel/--danger) must load before app.css which consumes them. If the bundler reorders or tree-shakes CSS imports, custom properties resolve to initial/empty and the UI renders unstyled or with wrong colors (cosmetic, non-crashing).",
+        "mitigation": "Import tokens.css before app.css from a single entry (or @import tokens first inside app.css) and verify computed styles: assert getComputedStyle(document.documentElement).getPropertyValue('--grass') is non-empty after load."
+      }
+    ],
+    "verificationChecks": [
+      "Zero-error boot check (run after EVERY extraction stage): load the page, open console, assert ZERO uncaught ReferenceError/TypeError at load. This alone catches import-time side effects (canvas/audio/network before ready) and circular-import undefined-at-init. Spy on getContext/AudioContext/WebSocket during module evaluation (before initDom) and assert none were called — proves no top-level DOM/audio/net effects.",
+      "Handler-coverage check (44 not 32): at boot, querySelectorAll every element with an on*= attribute, parse each referenced identifier, and assert it exists on window; then programmatically dispatch each handler and assert none throw ReferenceError. This fails loudly if the bridge covers only 32 of 44 handlers or if a module load aborted the bridge cascade.",
+      "THE Infinity render-loop test (run at every stage touching hud/tournament/fighter/draw, with the REAL updateHUD — never stubbed): start a World Cup group match (or Test Mode with f.stocks=Infinity), let loop() run >=120 frames, and assert (a) no RangeError in console, (b) HUD renders the stock as ∞, (c) requestAnimationFrame is still firing (a frame counter keeps incrementing) and (d) standings sort with an Infinity-stock entry does not throw. This is the direct regression guard for the six-build bug.",
+      "Loop error-containment test: inject a one-time throw into draw(), run the loop, and assert it logs exactly once (__loopErrLogged) AND the page does not silently freeze — in dev it surfaces a visible error overlay/rethrow, not a black screen. Remove the injected throw and confirm frames resume.",
+      "Live-state aliasing test: start a match, confirm the HUD timer/stock and hazardT-driven effects visibly advance (proves hazardT is read live, not snapshotted). Then trigger a wholesale pool/fighters reassignment via a rematch (buildFighters) and via a simulated net applySnapshot, and assert draw() renders the NEW fighters/particles — proving every consumer reads state.fighters/state.particles, not a stale imported copy.",
+      "hazardT-timing liveness: run a match long enough to exercise freeze cap (45f), curse decay (one stack/1.5s), item spawn countdown, and lastKoFrame KO timing; assert each ticks/decays on schedule after the split. A frozen counter (snapshotted primitive) shows up here as effects that never decay.",
+      "Read-only-binding / setter-coverage check: build the prod bundle in strict mode and treat any 'Assignment to constant variable' as a blocker. At runtime, exercise every reassignment path — resize() changes W/H, resetKeys swaps KEYS, startTournament swaps TOURNEY wholesale, applySnapshot swaps render pools, setStage/setChosen from select screen — and assert the change is observed by a different module (proves the setter updates the live singleton).",
+      "Strict-mode implicit-global check: run eliminate (KO a fighter) and beginMatchNow and an AI co-op plan capture, and assert no ReferenceError from lastKoFrame/TEAM_PLAN/elimSeq or bare assignments. Grep the moved code for unqualified assignments to undeclared identifiers and for top-level `this.` as a static gate.",
+      "Per-mode loop-start test: invoke each starter — startMatch, beginMatchNow, startTutorial, startBossRush, watchFixture, and a net applySnapshot — and assert loop() actually starts and produces moving frames. Proves relocating loop()/step() into fighter.js did not break any mode->loop call across the module boundary.",
+      "Audio unlock test: at load assert SND.ctx===null (no context created pre-gesture). On the first user click, assert SND.ctx.state transitions suspended->running and a test tone is audible, and that a mode started by that same click plays music (not silence). Confirms the unlock listener wins the race against startMusic.",
+      "Dispatch-table completeness (post-minify): after a production minified build, iterate every ROSTER kit and assert kit.special/up/down/attack each resolve to a function in specials.js tables, and every SMASHES key resolves — catches reserved-word ('switch'/'static') key mangling and any table entry built by a call-time-only helper.",
+      "DOM-contract assertion: generate the list of ids referenced by getElementById in JS and assert each exists in the extracted index.html; fire go() for every screen id and assert exactly one .screen.active and that #hud.active gates correctly. Catches any id/class renamed or dropped during the HTML split.",
+      "Electron parity suite: run the ENTIRE behavioral suite above inside the PACKAGED Electron build (not just Vite dev): assert inline handlers fire under the shipped CSP, fonts render without network fallback, BStore round-trips a saved level and stats via localStorage (real origin, not file://), and audio unlocks. This is the check that catches CSP/file:// divergence dev hides.",
+      "Golden behavioral parity vs monolith v66: drive both the monolith and the split build through a scripted, fixed-seed match (recorded input sequence) covering FFA, Teams, a boss phase transition, a World Cup group match (infinite stocks), and a KO/eliminate; diff HUD stock/percent text, standings order, KO count, and final placement. Equality proves behavior is PRESERVED, not merely that the build 'runs' — the anti-six-build-bug backstop for each extraction stage."
+    ]
+  },
+  "workflowProgress": [
+    {
+      "type": "workflow_phase",
+      "index": 1,
+      "title": "Map"
+    },
+    {
+      "type": "workflow_phase",
+      "index": 2,
+      "title": "Synthesize"
+    },
+    {
+      "type": "workflow_phase",
+      "index": 3,
+      "title": "Audit"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 1,
+      "label": "map:7-281",
+      "phaseIndex": 1,
+      "phaseTitle": "Map",
+      "agentId": "aea9e8b4c136a8862",
+      "agentType": "general-purpose",
+      "model": "claude-opus-4-8",
+      "state": "done",
+      "startedAt": 1784321078303,
+      "queuedAt": 1784321078273,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "lastToolSummary": "7-280",
+      "promptPreview": "You are reverse-engineering ONE slice of a 5,861-line single-file HTML game (\"Battle for Smash Island\") that is being split into ES modules for a Vite + Electron app.\n\nRead lines 7-281 of the file using the Read tool: file_path=\"C:\\Users\\pkupe\\Aardvark\\smash-island\\artifacts\\V1\\index.html\", offset=7, limit=274. This slice is labelled: \"CSS styles\".\n\nCatalog EVERY top-level symbol declared in this …",
+      "lastProgressAt": 1784321130336,
+      "tokens": 47544,
+      "toolCalls": 2,
+      "durationMs": 52032,
+      "resultPreview": "{\"range\":\"7-280\",\"label\":\"CSS styles (entire &lt;style&gt; block; no JS symbols)\",\"topLevelSymbols\":[],\"sharedStateDefined\":[],\"sharedStateConsumed\":[],\"domIds\":[\"app\",\"title\",\"select\",\"segTeams\",\"controls\",\"hud\",\"edZoneType\",\"edStrength\",\"result\",\"hint\"],\"domHandlersReferenced\":[],\"windowGlobals\":[],\"risks\":[\"Entire slice is CSS -> target module is styles/*.css. Zero JavaScript symbols: no const/…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 2,
+      "label": "map:281-650",
+      "phaseIndex": 1,
+      "phaseTitle": "Map",
+      "agentId": "af776e07f08c20309",
+      "agentType": "general-purpose",
+      "model": "claude-opus-4-8",
+      "state": "done",
+      "startedAt": 1784321078306,
+      "queuedAt": 1784321078274,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "lastToolSummary": "281-650",
+      "promptPreview": "You are reverse-engineering ONE slice of a 5,861-line single-file HTML game (\"Battle for Smash Island\") that is being split into ES modules for a Vite + Electron app.\n\nRead lines 281-650 of the file using the Read tool: file_path=\"C:\\Users\\pkupe\\Aardvark\\smash-island\\artifacts\\V1\\index.html\", offset=281, limit=369. This slice is labelled: \"DOM body + screen templates\".\n\nCatalog EVERY top-level sym…",
+      "lastProgressAt": 1784321177621,
+      "tokens": 45902,
+      "toolCalls": 2,
+      "durationMs": 99315,
+      "resultPreview": "{\"range\":\"281-650\",\"label\":\"DOM body + screen templates (index.html shell) — pure HTML markup, no JS symbols declared\",\"topLevelSymbols\":[],\"domIds\":[\"app\",\"cv\",\"title\",\"soundToggle\",\"homeApiKey\",\"homeKeyNote\",\"editor\",\"edTool\",\"edHazard\",\"edProps\",\"edZoneRow\",\"edZoneType\",\"edRotBtn\",\"edStrRow\",\"edStrLabel\",\"edStrength\",\"edcanvas\",\"edName\",\"edLevelList\",\"test\",\"testDummies\",\"testBehavior\",\"testDam…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 3,
+      "label": "map:650-878",
+      "phaseIndex": 1,
+      "phaseTitle": "Map",
+      "agentId": "a73b17a24010b244c",
+      "agentType": "general-purpose",
+      "model": "claude-opus-4-8",
+      "state": "done",
+      "startedAt": 1784321078307,
+      "queuedAt": 1784321078274,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "lastToolSummary": "650-878",
+      "promptPreview": "You are reverse-engineering ONE slice of a 5,861-line single-file HTML game (\"Battle for Smash Island\") that is being split into ES modules for a Vite + Electron app.\n\nRead lines 650-878 of the file using the Read tool: file_path=\"C:\\Users\\pkupe\\Aardvark\\smash-island\\artifacts\\V1\\index.html\", offset=650, limit=228. This slice is labelled: \"header + ROSTER + STADIUMS + CONTROLS + state\".\n\nCatalog E…",
+      "lastProgressAt": 1784321165659,
+      "tokens": 45823,
+      "toolCalls": 2,
+      "durationMs": 87352,
+      "resultPreview": "{\"range\":\"650-878\",\"label\":\"header + ROSTER + STADIUMS + CONTROLS + state\",\"topLevelSymbols\":[{\"name\":\"ROSTER\",\"kind\":\"const\",\"line\":658,\"purpose\":\"Registry array of every fighter (name/weight/color/play flag/kit special+desc); source of truth for character select and kit dispatch.\",\"proposedModule\":\"src/data/roster.js\"},{\"name\":\"STAGES\",\"kind\":\"const\",\"line\":780,\"purpose\":\"Array of stadium defini…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 4,
+      "label": "map:878-1010",
+      "phaseIndex": 1,
+      "phaseTitle": "Map",
+      "agentId": "a654193360de7438c",
+      "agentType": "general-purpose",
+      "model": "claude-opus-4-8",
+      "state": "done",
+      "startedAt": 1784321078307,
+      "queuedAt": 1784321078274,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "lastToolSummary": "878-1009",
+      "promptPreview": "You are reverse-engineering ONE slice of a 5,861-line single-file HTML game (\"Battle for Smash Island\") that is being split into ES modules for a Vite + Electron app.\n\nRead lines 878-1010 of the file using the Read tool: file_path=\"C:\\Users\\pkupe\\Aardvark\\smash-island\\artifacts\\V1\\index.html\", offset=878, limit=132. This slice is labelled: \"AUDIO (sfx + music)\".\n\nCatalog EVERY top-level symbol dec…",
+      "lastProgressAt": 1784321150920,
+      "tokens": 41126,
+      "toolCalls": 2,
+      "durationMs": 72613,
+      "resultPreview": "{\"range\":\"878-1009\",\"label\":\"AUDIO (sfx + music)\",\"topLevelSymbols\":[{\"name\":\"SND\",\"kind\":\"object-literal\",\"line\":883,\"purpose\":\"Mutable WebAudio state singleton: AudioContext + master/music/sfx GainNodes, on/musicOn/started flags, and internal timers (_lastHit,_musicTimer,_step).\",\"proposedModule\":\"src/audio/*\"},{\"name\":\"sndInit\",\"kind\":\"function\",\"line\":887,\"purpose\":\"Lazily creates the AudioCon…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 5,
+      "label": "map:1010-1242",
+      "phaseIndex": 1,
+      "phaseTitle": "Map",
+      "agentId": "a1db6b118b431496a",
+      "agentType": "general-purpose",
+      "model": "claude-opus-4-8",
+      "state": "done",
+      "startedAt": 1784321078307,
+      "queuedAt": 1784321078274,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "lastToolSummary": "1010-1241",
+      "promptPreview": "You are reverse-engineering ONE slice of a 5,861-line single-file HTML game (\"Battle for Smash Island\") that is being split into ES modules for a Vite + Electron app.\n\nRead lines 1010-1242 of the file using the Read tool: file_path=\"C:\\Users\\pkupe\\Aardvark\\smash-island\\artifacts\\V1\\index.html\", offset=1010, limit=232. This slice is labelled: \"UI helpers + screen router + roster board + control rem…",
+      "lastProgressAt": 1784321251157,
+      "tokens": 43927,
+      "toolCalls": 2,
+      "durationMs": 172850,
+      "resultPreview": "{\"range\":\"1010-1241\",\"label\":\"UI helpers + screen router + roster board + control remap + input\",\"topLevelSymbols\":[{\"name\":\"cv\",\"kind\":\"const\",\"line\":1010,\"purpose\":\"Reference to the main <canvas id='cv'> element (resolved at import time)\",\"proposedModule\":\"src/core/state.js\"},{\"name\":\"ctx\",\"kind\":\"const\",\"line\":1011,\"purpose\":\"2D rendering context obtained from cv; shared draw target\",\"proposedM…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 6,
+      "label": "map:1242-1443",
+      "phaseIndex": 1,
+      "phaseTitle": "Map",
+      "agentId": "a3cd7a023e6db660f",
+      "agentType": "general-purpose",
+      "model": "claude-opus-4-8",
+      "state": "done",
+      "startedAt": 1784321078308,
+      "queuedAt": 1784321078275,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "lastToolSummary": "1242-1443",
+      "promptPreview": "You are reverse-engineering ONE slice of a 5,861-line single-file HTML game (\"Battle for Smash Island\") that is being split into ES modules for a Vite + Electron app.\n\nRead lines 1242-1443 of the file using the Read tool: file_path=\"C:\\Users\\pkupe\\Aardvark\\smash-island\\artifacts\\V1\\index.html\", offset=1242, limit=201. This slice is labelled: \"modes header + watch AI tournament + TUTORIAL\".\n\nCatalo…",
+      "lastProgressAt": 1784321367397,
+      "tokens": 42475,
+      "toolCalls": 2,
+      "durationMs": 289088,
+      "resultPreview": "{\"range\":\"1242-1443\",\"label\":\"modes header + watch AI tournament + TUTORIAL\",\"topLevelSymbols\":[{\"name\":\"resize\",\"kind\":\"function\",\"line\":1244,\"purpose\":\"Recompute canvas pixel size (W/H) and world dims (WW/WH) from cv.getBoundingClientRect(), clamping a not-yet-laid-out 0-size canvas to window/W/H fallbacks.\",\"proposedModule\":\"src/render/draw.js\"},{\"name\":\"startMatch\",\"kind\":\"function\",\"line\":125…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 7,
+      "label": "map:1443-1722",
+      "phaseIndex": 1,
+      "phaseTitle": "Map",
+      "agentId": "a08f7ba3cacef3dc7",
+      "agentType": "general-purpose",
+      "model": "claude-opus-4-8",
+      "state": "done",
+      "startedAt": 1784321130337,
+      "queuedAt": 1784321078276,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "lastToolSummary": "1443-1721",
+      "promptPreview": "You are reverse-engineering ONE slice of a 5,861-line single-file HTML game (\"Battle for Smash Island\") that is being split into ES modules for a Vite + Electron app.\n\nRead lines 1443-1722 of the file using the Read tool: file_path=\"C:\\Users\\pkupe\\Aardvark\\smash-island\\artifacts\\V1\\index.html\", offset=1443, limit=279. This slice is labelled: \"tournament group stage + hub + watch fixture\".\n\nCatalog…",
+      "lastProgressAt": 1784321233867,
+      "tokens": 44960,
+      "toolCalls": 2,
+      "durationMs": 103530,
+      "resultPreview": "{\"range\":\"1443-1721\",\"label\":\"tournament group stage + hub + watch fixture\",\"topLevelSymbols\":[{\"name\":\"buildGroupFixtures\",\"kind\":\"function\",\"line\":1444,\"purpose\":\"Build this matchday's round-robin group fixtures across all 12 groups into TOURNEY.fixtures\",\"proposedModule\":\"src/modes/tournament.js\"},{\"name\":\"simGroupMatch\",\"kind\":\"function\",\"line\":1457,\"purpose\":\"Simulate an unwatched group match…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 8,
+      "label": "map:1722-2017",
+      "phaseIndex": 1,
+      "phaseTitle": "Map",
+      "agentId": "af43d581a2362d5b9",
+      "agentType": "general-purpose",
+      "model": "claude-opus-4-8",
+      "state": "done",
+      "startedAt": 1784321150921,
+      "queuedAt": 1784321078276,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "lastToolSummary": "1722-2017",
+      "promptPreview": "You are reverse-engineering ONE slice of a 5,861-line single-file HTML game (\"Battle for Smash Island\") that is being split into ES modules for a Vite + Electron app.\n\nRead lines 1722-2017 of the file using the Read tool: file_path=\"C:\\Users\\pkupe\\Aardvark\\smash-island\\artifacts\\V1\\index.html\", offset=1722, limit=295. This slice is labelled: \"BOSS RUSH + run recorder + co-op planning + team chat\".…",
+      "lastProgressAt": 1784321443906,
+      "tokens": 46045,
+      "toolCalls": 2,
+      "durationMs": 292985,
+      "resultPreview": "{\"range\":\"1722-2017\",\"label\":\"boss-rush + run-recorder + co-op planning + team-chat\",\"topLevelSymbols\":[{\"name\":\"BOSSRUSH\",\"kind\":\"object-literal\",\"line\":1722,\"purpose\":\"Boss Rush run-time state singleton (active, bossIdx, cleared, defeated, loop, dmgMult) — reassigned to a richer object in startBossRush()\",\"proposedModule\":\"src/core/state.js\"},{\"name\":\"RUN_REC\",\"kind\":\"object-literal\",\"line\":1726…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 9,
+      "label": "map:2017-2417",
+      "phaseIndex": 1,
+      "phaseTitle": "Map",
+      "agentId": "a754b0630f24042f0",
+      "agentType": "general-purpose",
+      "model": "claude-opus-4-8",
+      "state": "done",
+      "startedAt": 1784321165660,
+      "queuedAt": 1784321078276,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "lastToolSummary": "2017-2417",
+      "promptPreview": "You are reverse-engineering ONE slice of a 5,861-line single-file HTML game (\"Battle for Smash Island\") that is being split into ES modules for a Vite + Electron app.\n\nRead lines 2017-2417 of the file using the Read tool: file_path=\"C:\\Users\\pkupe\\Aardvark\\smash-island\\artifacts\\V1\\index.html\", offset=2017, limit=400. This slice is labelled: \"arena/stage build + HUD\".\n\nCatalog EVERY top-level symb…",
+      "lastProgressAt": 1784321376387,
+      "tokens": 54078,
+      "toolCalls": 3,
+      "durationMs": 210727,
+      "resultPreview": "{\"range\":\"2017-2417\",\"label\":\"arena/stage build + HUD\",\"topLevelSymbols\":[{\"name\":\"setupWorld\",\"kind\":\"function\",\"line\":2013,\"purpose\":\"Master world/stage geometry builder — sets WW/WH/camX/camY, worldPlats, worldZones, floors, bases, spawnZones for the current match across three layouts: big scrolling FFA, small single-screen FFA/1v1/custom, and the Teams 'Yoyle Crossing' arena (tower/bluffs/brid…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 10,
+      "label": "map:2417-2741",
+      "phaseIndex": 1,
+      "phaseTitle": "Map",
+      "agentId": "a45a0d063bc5a0863",
+      "agentType": "general-purpose",
+      "model": "claude-opus-4-8",
+      "state": "done",
+      "startedAt": 1784321177623,
+      "queuedAt": 1784321078276,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "lastToolSummary": "2417-2741",
+      "promptPreview": "You are reverse-engineering ONE slice of a 5,861-line single-file HTML game (\"Battle for Smash Island\") that is being split into ES modules for a Vite + Electron app.\n\nRead lines 2417-2741 of the file using the Read tool: file_path=\"C:\\Users\\pkupe\\Aardvark\\smash-island\\artifacts\\V1\\index.html\", offset=2417, limit=324. This slice is labelled: \"PHYSICS + COMBAT + boss attack system (part 1)\".\n\nCatal…",
+      "lastProgressAt": 1784321336695,
+      "tokens": 55388,
+      "toolCalls": 3,
+      "durationMs": 159072,
+      "resultPreview": "{\"range\":\"2417-2741\",\"label\":\"PHYSICS + COMBAT + boss attack system (part 1)\",\"topLevelSymbols\":[{\"name\":\"GRAV\",\"kind\":\"const\",\"purpose\":\"Gravity acceleration tuning constant used by physics/step\",\"proposedModule\":\"src/core/constants.js\",\"line\":2420},{\"name\":\"MOVE\",\"kind\":\"const\",\"purpose\":\"Horizontal ground acceleration per input frame\",\"proposedModule\":\"src/core/constants.js\",\"line\":2420},{\"name…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 11,
+      "label": "map:2741-3091",
+      "phaseIndex": 1,
+      "phaseTitle": "Map",
+      "agentId": "a20f4d802b8925a9f",
+      "agentType": "general-purpose",
+      "model": "claude-opus-4-8",
+      "state": "done",
+      "startedAt": 1784321233867,
+      "queuedAt": 1784321078276,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "lastToolSummary": "2741-3091",
+      "promptPreview": "You are reverse-engineering ONE slice of a 5,861-line single-file HTML game (\"Battle for Smash Island\") that is being split into ES modules for a Vite + Electron app.\n\nRead lines 2741-3091 of the file using the Read tool: file_path=\"C:\\Users\\pkupe\\Aardvark\\smash-island\\artifacts\\V1\\index.html\", offset=2741, limit=350. This slice is labelled: \"boss attacks: screechy/tendrils/mind-read/power-drain (…",
+      "lastProgressAt": 1784321466387,
+      "tokens": 48956,
+      "toolCalls": 2,
+      "durationMs": 232520,
+      "resultPreview": "{\"range\":\"2741-3091\",\"label\":\"boss attacks part 2: swallow/tendrils/summons + master game-loop step()\",\"topLevelSymbols\":[{\"name\":\"BOSS_DMG_BASE\",\"kind\":\"const\",\"line\":2916,\"purpose\":\"Immutable base boss-attack damage (30% to a fighter's meter per hit).\",\"proposedModule\":\"src/engine/boss.js\"},{\"name\":\"bossDmg\",\"kind\":\"function\",\"line\":2917,\"purpose\":\"Returns current boss hit damage = BOSS_DMG_BASE…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 12,
+      "label": "map:3091-3549",
+      "phaseIndex": 1,
+      "phaseTitle": "Map",
+      "agentId": "ae5153f78735f1632",
+      "agentType": "general-purpose",
+      "model": "claude-opus-4-8",
+      "state": "done",
+      "startedAt": 1784321251158,
+      "queuedAt": 1784321078276,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "lastToolSummary": "3091-3549",
+      "promptPreview": "You are reverse-engineering ONE slice of a 5,861-line single-file HTML game (\"Battle for Smash Island\") that is being split into ES modules for a Vite + Electron app.\n\nRead lines 3091-3549 of the file using the Read tool: file_path=\"C:\\Users\\pkupe\\Aardvark\\smash-island\\artifacts\\V1\\index.html\", offset=3091, limit=458. This slice is labelled: \"fighter update/step (input, move, integrate, effect zon…",
+      "lastProgressAt": 1784321403494,
+      "tokens": 68776,
+      "toolCalls": 5,
+      "durationMs": 152336,
+      "resultPreview": "{\"range\":\"3091-3549\",\"label\":\"fighter update/step (input, move, integrate, effect zones)\",\"topLevelSymbols\":[{\"name\":\"step\",\"kind\":\"function\",\"line\":3076,\"purpose\":\"Master per-frame simulation tick: reads input (local/remote/AI) and status timers for every fighter, moves+integrates them, resolves solid/one-way/rotated platform collisions, applies effect zones and blast/hazard KO, then advances the…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 13,
+      "label": "map:3549-4009",
+      "phaseIndex": 1,
+      "phaseTitle": "Map",
+      "agentId": "a79d969c1c7288ede",
+      "agentType": "general-purpose",
+      "model": "claude-opus-4-8",
+      "state": "done",
+      "startedAt": 1784321336696,
+      "queuedAt": 1784321078276,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "lastToolSummary": "3549-4009",
+      "promptPreview": "You are reverse-engineering ONE slice of a 5,861-line single-file HTML game (\"Battle for Smash Island\") that is being split into ES modules for a Vite + Electron app.\n\nRead lines 3549-4009 of the file using the Read tool: file_path=\"C:\\Users\\pkupe\\Aardvark\\smash-island\\artifacts\\V1\\index.html\", offset=3549, limit=460. This slice is labelled: \"attacks + comeback scaling + personalized smashes + up-…",
+      "lastProgressAt": 1784321496242,
+      "tokens": 65131,
+      "toolCalls": 5,
+      "durationMs": 159546,
+      "resultPreview": "{\"range\":\"3549-4009\",\"label\":\"attacks + comeback scaling + personalized smashes + up-specials + ground move\",\"topLevelSymbols\":[{\"name\":\"COMEBACK\",\"kind\":\"object-literal\",\"line\":3561,\"purpose\":\"Config table keyed by kit.special marking designated low-tier fighters for comeback scaling (type proj|shock, optional flavor freeze/armor)\",\"proposedModule\":\"src/engine/attacks.js\"},{\"name\":\"COMEBACK_IFRAM…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 14,
+      "label": "map:4009-4476",
+      "phaseIndex": 1,
+      "phaseTitle": "Map",
+      "agentId": "af7c2190c2c4bd38e",
+      "agentType": "general-purpose",
+      "model": "claude-opus-4-8",
+      "state": "done",
+      "startedAt": 1784321367398,
+      "queuedAt": 1784321078276,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "lastToolSummary": "4009-4476",
+      "promptPreview": "You are reverse-engineering ONE slice of a 5,861-line single-file HTML game (\"Battle for Smash Island\") that is being split into ES modules for a Vite + Electron app.\n\nRead lines 4009-4476 of the file using the Read tool: file_path=\"C:\\Users\\pkupe\\Aardvark\\smash-island\\artifacts\\V1\\index.html\", offset=4009, limit=467. This slice is labelled: \"down-specials + specials + boss damage cap\".\n\nCatalog E…",
+      "lastProgressAt": 1784321521271,
+      "tokens": 66728,
+      "toolCalls": 5,
+      "durationMs": 153873,
+      "resultPreview": "{\"range\":\"4009-4476\",\"label\":\"down-specials + specials + boss damage cap\",\"topLevelSymbols\":[{\"name\":\"DOWNSPECIALS\",\"kind\":\"object-literal\",\"line\":4012,\"purpose\":\"Map of kit special-key -> down+special handler(f) (traps, counters, stances, defense buffs) for ~70 fighters.\",\"proposedModule\":\"src/engine/specials.js\"},{\"name\":\"doDownSpecial\",\"kind\":\"function\",\"line\":4094,\"purpose\":\"Dispatch a fighter…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 15,
+      "label": "map:4476-4936",
+      "phaseIndex": 1,
+      "phaseTitle": "Map",
+      "agentId": "aad9c4de161d4c358",
+      "agentType": "general-purpose",
+      "model": "claude-opus-4-8",
+      "state": "done",
+      "startedAt": 1784321376388,
+      "queuedAt": 1784321078277,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "lastToolSummary": "4476-4936",
+      "promptPreview": "You are reverse-engineering ONE slice of a 5,861-line single-file HTML game (\"Battle for Smash Island\") that is being split into ES modules for a Vite + Electron app.\n\nRead lines 4476-4936 of the file using the Read tool: file_path=\"C:\\Users\\pkupe\\Aardvark\\smash-island\\artifacts\\V1\\index.html\", offset=4476, limit=460. This slice is labelled: \"hit resolution + test-mode DPS + match recording + plac…",
+      "lastProgressAt": 1784321604610,
+      "tokens": 50708,
+      "toolCalls": 2,
+      "durationMs": 228221,
+      "resultPreview": "{\"range\":\"4476-4936\",\"label\":\"hit resolution + test-mode DPS + match recording + placement scoring + particles\",\"topLevelSymbols\":[{\"name\":\"knock\",\"kind\":\"function\",\"line\":4561,\"purpose\":\"Apply a knockback impulse (sets vx/vy, clears onground); test-mode anchored dummies absorb it so they stay put.\",\"proposedModule\":\"src/engine/hit.js\"},{\"name\":\"applyZone\",\"kind\":\"function\",\"line\":4568,\"purpose\":\"…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 16,
+      "label": "map:4936-5406",
+      "phaseIndex": 1,
+      "phaseTitle": "Map",
+      "agentId": "af4fbbb8f15720268",
+      "agentType": "general-purpose",
+      "model": "claude-opus-4-8",
+      "state": "done",
+      "startedAt": 1784321403494,
+      "queuedAt": 1784321078277,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "lastToolSummary": "4936-5405",
+      "promptPreview": "You are reverse-engineering ONE slice of a 5,861-line single-file HTML game (\"Battle for Smash Island\") that is being split into ES modules for a Vite + Electron app.\n\nRead lines 4936-5406 of the file using the Read tool: file_path=\"C:\\Users\\pkupe\\Aardvark\\smash-island\\artifacts\\V1\\index.html\", offset=4936, limit=470. This slice is labelled: \"AI navigation + archetypes\".\n\nCatalog EVERY top-level s…",
+      "lastProgressAt": 1784321486788,
+      "tokens": 50990,
+      "toolCalls": 2,
+      "durationMs": 83293,
+      "resultPreview": "{\"range\":\"4936-5405\",\"label\":\"AI navigation + archetypes\",\"topLevelSymbols\":[{\"name\":\"AI_CLASS\",\"kind\":\"object-literal\",\"purpose\":\"Const lookup table mapping each character's descriptive `arch` string onto one of a small set of behavior-class keys (rush/zone/trap/grapple/heavy/evade/brawl).\",\"proposedModule\":\"src/ai/ai.js\",\"line\":4942},{\"name\":\"aiClass\",\"kind\":\"function\",\"purpose\":\"Resolves a figh…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 17,
+      "label": "map:5406-5949",
+      "phaseIndex": 1,
+      "phaseTitle": "Map",
+      "agentId": "ae517e2e3527512e8",
+      "agentType": "general-purpose",
+      "model": "claude-opus-4-8",
+      "state": "done",
+      "startedAt": 1784321443907,
+      "queuedAt": 1784321078277,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "lastToolSummary": "5406-5949",
+      "promptPreview": "You are reverse-engineering ONE slice of a 5,861-line single-file HTML game (\"Battle for Smash Island\") that is being split into ES modules for a Vite + Electron app.\n\nRead lines 5406-5949 of the file using the Read tool: file_path=\"C:\\Users\\pkupe\\Aardvark\\smash-island\\artifacts\\V1\\index.html\", offset=5406, limit=543. This slice is labelled: \"render/draw (world + screen overlays + nametags)\".\n\nCat…",
+      "lastProgressAt": 1784321551746,
+      "tokens": 56450,
+      "toolCalls": 2,
+      "durationMs": 107839,
+      "resultPreview": "{\"range\":\"5406-5949\",\"label\":\"render/draw (world + screen overlays + nametags)\",\"topLevelSymbols\":[{\"name\":\"updateCamera\",\"kind\":\"function\",\"line\":5409,\"purpose\":\"Smoothly follows the local 'you' fighter, clamping the zoomed camera (camX/camY) inside world bounds on scrolling arenas.\",\"proposedModule\":\"src/render/draw.js\"},{\"name\":\"draw\",\"kind\":\"function\",\"line\":5424,\"purpose\":\"Master per-frame re…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 18,
+      "label": "map:5949-6217",
+      "phaseIndex": 1,
+      "phaseTitle": "Map",
+      "agentId": "a49785ea67b3a0b84",
+      "agentType": "general-purpose",
+      "model": "claude-opus-4-8",
+      "state": "done",
+      "startedAt": 1784321466388,
+      "queuedAt": 1784321078277,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "lastToolSummary": "5949-6216",
+      "promptPreview": "You are reverse-engineering ONE slice of a 5,861-line single-file HTML game (\"Battle for Smash Island\") that is being split into ES modules for a Vite + Electron app.\n\nRead lines 5949-6217 of the file using the Read tool: file_path=\"C:\\Users\\pkupe\\Aardvark\\smash-island\\artifacts\\V1\\index.html\", offset=5949, limit=268. This slice is labelled: \"NETCODE (WebSocket LAN) + netcode state sync + test con…",
+      "lastProgressAt": 1784321558059,
+      "tokens": 44165,
+      "toolCalls": 2,
+      "durationMs": 91671,
+      "resultPreview": "{\"range\":\"5949-6216\",\"label\":\"NETCODE (WebSocket LAN) + netcode state sync + test config\",\"topLevelSymbols\":[{\"name\":\"serializeState\",\"kind\":\"function\",\"line\":5951,\"purpose\":\"Host builds a compact JSON snapshot (world/floors/plats/bases/fighters/projectiles/beams/particles/banner) for clients to render.\",\"proposedModule\":\"src/net/netcode.js\"},{\"name\":\"applySnapshot\",\"kind\":\"function\",\"line\":5977,\"…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 19,
+      "label": "map:6217-6513",
+      "phaseIndex": 1,
+      "phaseTitle": "Map",
+      "agentId": "a91c168243f8d9adb",
+      "agentType": "general-purpose",
+      "model": "claude-opus-4-8",
+      "state": "done",
+      "startedAt": 1784321486789,
+      "queuedAt": 1784321078277,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "lastToolSummary": "6217-6513",
+      "promptPreview": "You are reverse-engineering ONE slice of a 5,861-line single-file HTML game (\"Battle for Smash Island\") that is being split into ES modules for a Vite + Electron app.\n\nRead lines 6217-6513 of the file using the Read tool: file_path=\"C:\\Users\\pkupe\\Aardvark\\smash-island\\artifacts\\V1\\index.html\", offset=6217, limit=296. This slice is labelled: \"LEVEL CREATOR/EDITOR + balance stats viewer + boot\".\n\nC…",
+      "lastProgressAt": 1784321636465,
+      "tokens": 48279,
+      "toolCalls": 2,
+      "durationMs": 149675,
+      "resultPreview": "{\"range\":\"6217-6513\",\"label\":\"LEVEL CREATOR/EDITOR + balance stats viewer + boot\",\"topLevelSymbols\":[{\"name\":\"ZONE_TYPES\",\"kind\":\"object-literal\",\"line\":6227,\"purpose\":\"Immutable map of effect-zone types (glue/ice/bounce/damage/heal/wind) -> label/color/default-strength/unit, used by the editor's zone tool and rendering.\",\"proposedModule\":\"src/editor/level-editor.js\"},{\"name\":\"ROT_STEPS\",\"kind\":\"c…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 20,
+      "label": "synthesize-map (retry 2)",
+      "phaseIndex": 2,
+      "phaseTitle": "Synthesize",
+      "agentId": "a9cc428d86ac1e757",
+      "agentType": "general-purpose",
+      "model": "claude-opus-4-8",
+      "state": "done",
+      "startedAt": 1784321636550,
+      "queuedAt": 1784321636471,
+      "attempt": 3,
+      "lastAttemptReason": "stalled",
+      "lastToolName": "StructuredOutput",
+      "promptPreview": "You are the lead architect for splitting a 5,861-line single-file HTML game into ES modules (Vite + Electron). Below is the exhaustive per-slice symbol catalog produced by 19 parallel readers of the actual source.\n\nProduce the definitive DECOMPOSITION MAP:\n1. coreStateExports — the complete list of mutable shared singletons that must live in src/core/state.js (union of all sharedStateDefined, dedu…",
+      "lastProgressAt": 1784326744160,
+      "tokens": 206263,
+      "toolCalls": 2,
+      "durationMs": 5107470,
+      "resultPreview": "{\"coreStateExports\":[{\"name\":\"cv\",\"kind\":\"const\",\"note\":\"main canvas element; LAZY-init on DOMContentLoaded via state.initDom(), never at import time\"},{\"name\":\"ctx\",\"kind\":\"const\",\"note\":\"2D context from cv; lazy-init with cv\"},{\"name\":\"W\",\"kind\":\"let\",\"note\":\"logical canvas width; reassigned by resize() — needs setter/object field\"},{\"name\":\"H\",\"kind\":\"let\",\"note\":\"logical canvas height; reassig…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 21,
+      "label": "risk-audit",
+      "phaseIndex": 3,
+      "phaseTitle": "Audit",
+      "agentId": "af2758369cdb14ceb",
+      "agentType": "general-purpose",
+      "model": "claude-opus-4-8",
+      "state": "done",
+      "startedAt": 1784326744173,
+      "queuedAt": 1784326744162,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "promptPreview": "You are an adversarial reviewer whose job is to find how this monolith->ES-modules split will BREAK at runtime. The game is a canvas fighter with WebAudio, WebSocket LAN, and 44 inline HTML on*= handlers. The design doc records that a '```.repeat(Infinity)```' HUD bug (infinite-stock World Cup matches) killed the render loop and took SIX builds to find because a test harness stubbed the HUD out.\n\n…",
+      "lastProgressAt": 1784327018585,
+      "tokens": 84836,
+      "toolCalls": 4,
+      "durationMs": 274412,
+      "resultPreview": "{\"risks\":[{\"title\":\"Inline on*= handlers resolve against module scope (or are killed by CSP) — dead buttons across the whole UI\",\"severity\":\"critical\",\"detail\":\"index.html has 44 inline on*= handlers (onclick=\\\"startMatch()\\\", onchange=\\\"TESTMODE.damage=this.value\\\", onclick=\\\"NET.host()\\\", etc.). ESM module scope is NOT global, so every handler resolves against window.* and throws ReferenceError …"
+    }
+  ],
+  "totalTokens": 1258550,
+  "totalToolCalls": 55
+}
