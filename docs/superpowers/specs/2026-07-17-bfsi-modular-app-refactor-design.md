@@ -20,12 +20,20 @@ Two problems to solve:
 | Decision | Choice |
 |---|---|
 | Build tool | **Vite** (multi-file ES-module source → two bundled targets) |
-| Deliverables | **(1) Desktop app** — installable **Electron** build, full game, Hollow-Knight-style installer. **(2) Web "Lite"** — a trimmed browser taster over the *same* `src/` core, that upsells to the desktop app. See §4a. |
+| Deliverables | **(1) Desktop app** — installable **Electron** build, full game, Hollow-Knight-style installer. **(2) Web "Lite"** — a trimmed browser taster over the *same* `src/` core, that upsells to the desktop app; it gains an **Online Rooms** section in a final phase (see §4b). See §4a. |
+| Lite content trim | **Stages only.** The Lite roster is **FULL** (same cast as desktop); only **STAGES** carry a lite flag and are filtered to a subset. The Lite-vs-desktop content difference is: stages (Lite = subset) + music (desktop only) + level editor / co-op planning / test mode (desktop only). |
 | Music source | **Royalty-free Pixabay tracks** — Undertale-style for menu/battle/tournament, atmospheric for boss — under the Pixabay Content License. Original "inspired-by" tracks only, **not** covers of specific copyrighted songs. (Desktop only — Lite has no music.) |
 | Music fallback | Synthesized bed always available, so desktop audio works with zero asset files present |
-| Scope | **Re-architecture only.** No gameplay changes (local 2P, mobile, balance are out). |
+| Online (web) | Web Lite gains an **Online Rooms** section as the **final phase** (§4b): room-code join + a public room browser, over the full roster + trimmed stage subset. Reuses `net/netcode.js` and needs a small always-on relay server. |
+| Scope | **Re-architecture + Web Lite (incl. final-phase online rooms).** No gameplay changes (local 2P, mobile, balance are out). |
 
 **Copyright boundary (non-negotiable):** We do **not** embed the actual Toby Fox (Undertale/Deltarune) or Christopher Larkin (Hollow Knight/Silksong) recordings, and we do **not** pull from third-party re-uploads of those OSTs (e.g. the SoundCloud "Hollow Knight OST" set). Only Pixabay-licensed originals or assets the owner personally licenses.
+
+**Build & priority order (owner-set):**
+1. **A — Modularization** — decompose the monolith into the ES-module tree; nothing else can be built cleanly until the split lands.
+2. **B — Music** — the layered adaptive engine (desktop only); the one intentional behavior change, built on the clean audio modules.
+3. **C — Web Lite (offline taster)** — ship the trimmed browser build; **no netcode** (its tree-shake test asserts `net/netcode.js` is absent from `dist-lite`). Zero-server, CDN-friendly, upsells to desktop.
+4. **D — Online Rooms (last)** — add `net/netcode.js` + the relay server + the rooms UI to Lite; deferred to last because, unlike A–C, it requires an always-on server.
 
 ## 3. Source of truth for the split
 
@@ -73,15 +81,16 @@ Two Vite outputs over one shared `src/` core. The clean module boundaries are wh
 |---|---|---|
 | Package | Electron installer (`npm run dist`) | Static site (`dist-lite/`, deployable to any host) |
 | Entry | `index.html` + `src/main.js` | `index.lite.html` + `src/main.lite.js` |
-| Modes | Arena (FFA+Teams), Tutorial, Boss Rush, World Cup, **LAN**, **level editor**, **co-op AI planning**, **Test/Sandbox** | Arena (FFA+Teams), Tutorial, Boss Rush, World Cup |
-| Content | Full roster + all stages | **Trimmed taster** roster + stage subset |
+| Modes | Arena (FFA+Teams), Tutorial, Boss Rush, World Cup, **LAN**, **level editor**, **co-op AI planning**, **Test/Sandbox** | Arena (FFA+Teams), Tutorial, Boss Rush, World Cup; **+ Online Rooms** (create/join by code + public room browser) — **final-phase (Plan D) addition** |
+| Content | Full roster + all stages | **Full roster + trimmed stage subset** (roster is *not* trimmed; only stages) |
+| Netcode | LAN via `net/netcode.js` | **Excluded until the rooms phase** — `net/netcode.js` is absent from `dist-lite` through Plan C, then **added** in Plan D for Online Rooms |
 | Music | Full adaptive engine + Pixabay tracks | **None** (SFX retained) |
 | Stats viewer | Yes | No (dev-facing) |
 
-**What Lite omits (its entry never imports these):** `net/netcode.js`, `editor/level-editor.js`, `modes/coop-planning.js`, `audio/music-director.js`, `audio/stem-player.js`, `audio/manifest.js`, the Test/Sandbox and stats-viewer paths, and the `public/assets/music/` payload. **Lite keeps** the whole engine, AI, renderer, HUD, router, `modes/arena|tutorial|boss-rush|tournament`, and `audio/bus.js`+`audio/sfx.js` (SFX only).
+**What Lite omits (its entry never imports these):** `editor/level-editor.js`, `modes/coop-planning.js`, `audio/music-director.js`, `audio/stem-player.js`, `audio/manifest.js`, the Test/Sandbox and stats-viewer paths, and the `public/assets/music/` payload. `net/netcode.js` is **omitted in Plan C** (offline taster) but **added in the rooms phase (Plan D)** for Online Rooms (§4b). **Lite keeps** the whole engine, AI, renderer, HUD, router, `modes/arena|tutorial|boss-rush|tournament`, and `audio/bus.js`+`audio/sfx.js` (SFX only), and — because the roster is no longer trimmed — the **full roster** (only stages are filtered).
 
 **Mechanism:**
-- **Trimmed content** stays single-source-of-truth: roster/stage entries carry a `lite: true` flag; the Lite build filters `ROSTER`/`STAGES` to that subset at load (a `BUILD.lite` constant injected via Vite `define`). No duplicated data tables.
+- **Trimmed content** stays single-source-of-truth: **only `STAGES` entries** carry a `lite: true` flag; the Lite build filters `STAGES` to that subset at load (a `BUILD.lite` constant injected via Vite `define`). **`ROSTER` is not filtered — Lite ships the full cast.** No duplicated data tables. (`makeApi({lite})` filters STAGES only; roster stays full.)
 - **`startMusic`/`stopMusic` stay callable** in both builds — the `audio/audio.js` facade no-ops music when `BUILD.lite` (or when the director module isn't present), so `modes/arena|tutorial|boss-rush` need no per-build branching. SFX calls are unchanged.
 - **Trimmed DOM shell:** `index.lite.html` drops the editor/lobby/co-op/test `.screen` blocks and their inline `on*=` handlers, so the boot-time handler-coverage assertion (§7) validates *per build* — a Lite handler referencing an omitted module fails loudly at Lite boot, not silently in prod.
 - **Tree-shaking guarantee:** because omitted features are only reachable through their (unimported) modules, Rollup drops them from the Lite bundle entirely — no dead LAN/editor/music code ships to the web.
@@ -89,6 +98,23 @@ Two Vite outputs over one shared `src/` core. The clean module boundaries are wh
 Every verification check in §12 runs against **both** targets; the golden-parity diff (§12) additionally asserts the Lite build reproduces monolith behavior for the modes it *does* include.
 
 > **Open reading to confirm at review:** "no music" is interpreted as *no music director/tracks, SFX retained*. If zero audio is wanted in Lite, the Lite entry also skips `audio/bus.js`+`audio/sfx.js` and `startSound` no-ops — a one-line change.
+
+## 4b. Online Rooms (web, final phase — Plan D)
+
+Web Lite gains an **Online Rooms** section as the **last** phase, after the offline taster (Plan C) ships. It is deliberately last because — unlike everything else in this project — it requires an **always-on server**.
+
+**Scope (only this):**
+- **(a) Room-code join** — create a room, get a **shareable code/link**, a friend joins by entering that code.
+- **(b) Room browser** — a list of **open public rooms** to join.
+- **No in-room chat. No spectating other rooms.** Those are explicitly out.
+
+**Content:** Online uses the **full roster + the trimmed stage subset** — identical content to the rest of Lite (roster full, stages a subset).
+
+**Reuse & mechanism:**
+- Reuses the existing **`net/netcode.js`** (WebSocket) — the same netcode the desktop LAN path uses. This is why Plan C keeps `net/netcode.js` out of `dist-lite` and Plan D adds it back in.
+- Needs a small **always-on relay server**: **rooms = relay channels keyed by a room code**, plus a **room-registry endpoint** that powers the browser list (open public rooms register/deregister; the browser reads that registry).
+
+**Phasing:** Plan C ships Lite with netcode **absent** (its tree-shake test asserts `net/netcode.js` is not in `dist-lite`). Plan D then adds `net/netcode.js` + the relay server + the rooms UI to the Lite build, and **updates the tree-shake test** so netcode is **allowed** in Lite from Plan D onward. The editor / co-op-planning / music-director / stem-player / manifest modules **stay excluded** from Lite in all phases.
 
 ## 5. Module architecture
 
@@ -197,16 +223,19 @@ Run after **every** extraction stage. Full list of 14 checks in the map JSON; th
 - **Dispatch completeness post-minify:** every `ROSTER` kit's `special/up/down/attack` and every `SMASHES` key resolves to a function.
 - **Electron parity suite:** the entire suite inside the packaged desktop build.
 - **Golden parity vs monolith:** drive the desktop build (and the Lite build, for the modes it includes) through a fixed-seed recorded-input match (FFA, Teams, a boss phase transition, a World Cup group match, a KO/eliminate) and diff HUD stock/percent text, standings order, KO count, final placement. Equality proves behavior is *preserved*, not merely that the build runs.
-- **Lite build checks:** the Lite bundle contains **no** LAN/editor/co-op/music code (assert omitted symbols are tree-shaken out); its trimmed roster/stage subset loads; its per-build handler assertion passes; and it runs in a plain browser with no console errors.
+- **Lite build checks:** through Plan C the Lite bundle contains **no** netcode/editor/co-op/music code (assert omitted symbols — incl. `net/netcode.js` — are tree-shaken out); its **full roster + trimmed stage subset** loads (roster is *not* trimmed; only stages); its per-build handler assertion passes; and it runs in a plain browser with no console errors. **From Plan D (Online Rooms) the tree-shake test is updated so `net/netcode.js` is *allowed* in Lite**, while editor / co-op-planning / music-director / stem-player / manifest **stay excluded** — plus a rooms check: create-room yields a joinable code and the room browser lists open public rooms against the deployed relay.
 
 ## 13. Out of scope
 
 Gameplay changes from the adversarial review (local 2-player, 60-second tutorial, starter roster, mobile/touch, balance passes, share loop). Those belong in a follow-up on top of the clean architecture. The `data-action`/CSP-hardening migration and the co-op `innerHTML` audit are recommended follow-ups, not this pass.
 
+**Web Lite Online Rooms is now in scope** as the final phase (Plan D, §4b) — but strictly limited to room-code join + a public room browser. Explicitly **out of scope even within rooms:** in-room chat, spectating other rooms, matchmaking/ranking, and any persistent accounts.
+
 ## 14. Definition of done
 
 - `npm run dev` launches the **desktop** Electron app; every screen, mode, boss, tournament, editor, and LAN path behaves identically to `artifacts/V1/index.html`.
-- `npm run dev:lite` runs the **Web Lite** build in a browser: Arena, Tutorial, Boss Rush, and World Cup on the trimmed roster/stage set, SFX but no music, and no LAN/editor/co-op code in the bundle.
+- `npm run dev:lite` runs the **Web Lite** build in a browser: Arena, Tutorial, Boss Rush, and World Cup on the **full roster + trimmed stage subset**, SFX but no music, and — through Plan C — no netcode/editor/co-op code in the bundle.
 - The full verification suite passes on both targets, including the golden-parity diff and the Electron packaged parity suite.
 - Desktop music is sample-accurate, layered by intensity, survives tab-background, and falls back to synth when assets are absent.
 - `npm run dist` produces a desktop installer; `npm run build:lite` produces a deployable `dist-lite/`.
+- **Online Rooms (final phase, Plan D):** a small **relay server is deployed** and always-on; on the web build, **create-room returns a working shareable code/link** that a second client can join, and the **room browser lists open public rooms** and joins them — over the full roster + trimmed stage subset, reusing `net/netcode.js`. The updated tree-shake test confirms netcode is present in Lite from Plan D while editor/co-op/music stay excluded. (No chat, no spectating.)

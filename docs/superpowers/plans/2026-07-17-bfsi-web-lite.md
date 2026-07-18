@@ -3,26 +3,26 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-> **EXECUTION ORDER — Plan C runs LAST.** This plan (C, web-lite) **depends on Plan A (modularization) and Plan B (music)** and executes strictly **after** both: order is **A → B → C**. Plan C targets the **post-Plan-B** module layout. Concretely it assumes: (a) Plan A owns `src/core/build.js` (the `BUILD.lite` flag), `src/core/handler-coverage.js` (the boot handler-coverage assertion), the single `test/` harness under `test/harness/` re-exported from `test/harness/index.js`, and the base `vite.config.js` with `define: { __LITE__: JSON.stringify(false) }`; (b) Plan B owns the `src/audio/audio.js` facade + `setMusicDirector()` registry and the `music-director.js`/`stem-player.js`/`manifest.js` engine, with SFX living in `audio/bus.js` + `audio/sfx.js`. Plan C **creates none of those**; it consumes them and adds only the Lite entry/shell/config/tests. Do not start Plan C until Plans A and B are merged.
+> **EXECUTION ORDER — A → B → C → D.** This plan (C, web-lite) **depends on Plan A (modularization) and Plan B (music)** and executes strictly **after** both. Plan C ships the **offline** Lite taster; it is **not** the last phase — the online **Rooms** feature (room-code join + a public room browser, reusing `net/netcode.js` over a small always-on relay server) is a separate final phase **Plan D**, which runs **after** C. Full order is **A → B → C → D**. Plan C targets the **post-Plan-B** module layout. Concretely it assumes: (a) Plan A owns `src/core/build.js` (the `BUILD.lite` flag), `src/core/handler-coverage.js` (the boot handler-coverage assertion), the single `test/` harness under `test/harness/` re-exported from `test/harness/index.js`, and the base `vite.config.js` with `define: { __LITE__: JSON.stringify(false) }`; (b) Plan B owns the `src/audio/audio.js` facade + `setMusicDirector()` registry and the `music-director.js`/`stem-player.js`/`manifest.js` engine, with SFX living in `audio/bus.js` + `audio/sfx.js`. Plan C **creates none of those**; it consumes them and adds only the Lite entry/shell/config/tests. Do not start Plan C until Plans A and B are merged.
 
-**Goal:** Ship a second, browser-deployable "Lite" Vite build over the *same* `src/` core as the Electron desktop app — Arena (FFA+Teams vs AI), Tutorial, Boss Rush, and World Cup on a trimmed roster/stage taster, with SFX but no music, and with LAN/editor/co-op/music/test-stats code provably tree-shaken out.
+**Goal:** Ship a second, browser-deployable "Lite" Vite build over the *same* `src/` core as the Electron desktop app — Arena (FFA+Teams vs AI), Tutorial, Boss Rush, and World Cup on the **full roster** with a **trimmed stage taster**, with SFX but no music, and with LAN/editor/co-op/music/test-stats code provably tree-shaken out. (The online **Rooms** feature is out of scope here — it is the next phase, Plan D, which runs after C and adds `net/netcode.js` + a relay server.)
 
-**Architecture:** Lite is defined by *which modules its entry imports*, not by forking gameplay code. Plan A's `BUILD.lite` constant (Vite `define`, owned by Plan A's `src/core/build.js`) drives (1) an in-place `ROSTER`/`STAGES` filter to the `lite:true` subset at load and (2) a trimmed `index.lite.html` DOM shell. Music is silenced by a *third, structural* mechanism rather than a flag: `src/main.lite.js` **never imports `music-director.js` and never calls `setMusicDirector()`**, so Plan B's `audio/audio.js` facade keeps its `_director` null and every music call no-ops while SFX (`audio/bus.js`/`audio/sfx.js`) still runs. Three modules that kept-code statically imports — `net/netcode.js` (via `engine/fighter.js`) and `modes/coop-planning.js` (via `modes/arena.js` + `ui/roster-screen.js`) — are redirected to no-op **lite stubs** by a per-mode Vite `resolveId` plugin; everything else Lite omits (`editor/level-editor.js`, `audio/music-director.js`/`stem-player.js`/`manifest.js`, the Test/Sandbox and stats-viewer paths) is simply never imported by `src/main.lite.js` + `src/ui/global-actions.lite.js` and Rollup drops it.
+**Architecture:** Lite is defined by *which modules its entry imports*, not by forking gameplay code. Plan A's `BUILD.lite` constant (Vite `define`, owned by Plan A's `src/core/build.js`) drives (1) an in-place `STAGES` filter to the `lite:true` subset at load — the **`ROSTER` stays full** (same cast as desktop) — and (2) a trimmed `index.lite.html` DOM shell. Music is silenced by a *third, structural* mechanism rather than a flag: `src/main.lite.js` **never imports `music-director.js` and never calls `setMusicDirector()`**, so Plan B's `audio/audio.js` facade keeps its `_director` null and every music call no-ops while SFX (`audio/bus.js`/`audio/sfx.js`) still runs. Three modules that kept-code statically imports — `net/netcode.js` (via `engine/fighter.js`) and `modes/coop-planning.js` (via `modes/arena.js` + `ui/roster-screen.js`) — are redirected to no-op **lite stubs** by a per-mode Vite `resolveId` plugin; everything else Lite omits (`editor/level-editor.js`, `audio/music-director.js`/`stem-player.js`/`manifest.js`, the Test/Sandbox and stats-viewer paths) is simply never imported by `src/main.lite.js` + `src/ui/global-actions.lite.js` and Rollup drops it.
 
 **Tech Stack:** Vite (multi-target, mode-switched), Rollup tree-shaking, ES modules, Vitest + jsdom (unit/DOM), Playwright (real-browser boot), Node (bundle-symbol assertions). Depends on **Plan A's** modular `src/` (build flag, handler-coverage module, single `test/` harness) and **Plan B's** audio facade + music-director registry. Executes after both (order A → B → C).
 
 ## Global Constraints
 - Node ≥ 20.19, Vite ≥ 5, Vitest ≥ 2, Playwright ≥ 1.44. `package.json` has `"type": "module"`.
-- **Single source of truth for content:** the trimmed roster/stage subset is expressed only as `lite: true` flags on existing `ROSTER`/`STAGES` entries in `src/data/roster.js` / `src/data/stages.js`. No duplicated data tables. The Lite build filters **in place** so every importer keeps seeing the live exported array binding.
-- **ESM live-binding / setter rule (from the map):** never reassign an imported binding; reassignable scalars go through `core/state.js` setters, wholesale array swaps through in-place mutators, object singletons are mutated in place. Lite stubs and the content filter must obey this — the filter mutates the live `ROSTER`/`STAGES` array in place (`arr.length=0; arr.push(...kept)`), never reassigns the export.
+- **Single source of truth for content:** the trimmed **stage** subset is expressed only as `lite: true` flags on existing `STAGES` entries in `src/data/stages.js`. The **`ROSTER` is FULL in Lite** (same cast as desktop) — it carries **no** `lite` flag and is **never** filtered. No duplicated data tables. The Lite build filters `STAGES` **in place** so every importer keeps seeing the live exported array binding.
+- **ESM live-binding / setter rule (from the map):** never reassign an imported binding; reassignable scalars go through `core/state.js` setters, wholesale array swaps through in-place mutators, object singletons are mutated in place. Lite stubs and the content filter must obey this — the filter mutates the live `STAGES` array in place (`arr.length=0; arr.push(...kept)`), never reassigns the export (`ROSTER` is untouched in every build).
 - **No top-level DOM/audio/net side effects:** every module (including all new Lite modules and stubs) must have zero DOM/canvas/`AudioContext`/`WebSocket`/network effects at import-time. `netcode.lite.js` must NOT open a socket; `coop-planning.lite.js` must NOT hit `api.anthropic.com`. (Plan A's `build.js` reads only the `__LITE__` define token — a pure leaf Plan C imports but does not create.)
-- **Behavior identical to the monolith except music:** Lite reproduces monolith behavior for Arena/Tutorial/Boss-Rush/World-Cup **on the trimmed content**. The only intended difference vs desktop is the absence of music (SFX retained).
+- **Behavior identical to the monolith except the trims:** Lite reproduces monolith behavior for Arena/Tutorial/Boss-Rush/World-Cup on the **full roster** and the **trimmed stage subset**. The intended differences vs desktop are exactly: a trimmed stage subset (full roster), the absence of music (SFX retained), and the absence of the level editor / co-op planning / test mode. (The online Rooms feature arrives later in Plan D.)
 - **Copyright boundary (non-negotiable):** Lite ships no music assets at all and embeds no third-party recordings; this is moot for Lite because the entire music engine and `public/assets/music/` payload are excluded.
 - **Plan B audio-facade contract (Plan C consumes it):** the post-Plan-B `src/audio/audio.js` exposes music via a `setMusicDirector(d)` registry holding `let _director = null` — it contains **no static `import` of `music-director.js`/`stem-player.js`/`manifest.js`**, and every facade method (`startMusic`/`stopMusic`/`setIntensity`/`tickMusic`) is a no-op while `_director` is null. Full `main.js` (Plan B) registers a director; **`main.lite.js` never imports `music-director.js` and never calls `setMusicDirector`**, so in Lite `_director` stays null forever — music no-ops while SFX (`audio/bus.js`/`audio/sfx.js`) is retained. This static-import-free boundary is what lets the music engine tree-shake out of Lite. Plan C does **not** modify `audio.js`; it only verifies this contract (Task 5) and honors it in `main.lite.js` (Task 8).
 - **Per-mode build, not one multi-page build (decision, grounded in the map):** because `engine/fighter.js` statically imports `net/netcode.js` (`applySnapshot`,`serializeState`) and `modes/arena.js` + `ui/roster-screen.js` statically import `modes/coop-planning.js` (`captureTeamPlan`,`refreshTeamChat`), a single Rollup build with both HTML inputs would place those excluded modules in the *shared* chunk graph and leak them into Lite. `vite.config.js` therefore defines **both** page targets (full + lite) in one config and selects one per invocation via `--mode`, applying the lite-only `resolveId` redirect and `define`. This is the only configuration that makes the tree-shake guarantee real.
 - **No stubbing of `updateHUD`/`buildHUD`/`draw`/`updateStandings` in any Lite test** (the six-build-bug process rule). The Lite Infinity/parity checks run the REAL HUD and draw.
-- **Lite roster/stage subset (fixed by this plan):**
-  - `roster.js` — `lite:true` on 12 fighters: **Firey, Leafy, Needle, Pin, Snowball, Bomby, Bubble, Teardrop, Flower, Tennis Ball, Gelatin, Golf Ball** (distinct kits incl. `freeze` and `debuff`/curse to exercise `hazardT`-timing paths). `BOSS_ROSTER` and `ASSIST_ROSTER` are NOT filtered (Boss Rush + item assists need them).
+- **Lite stage subset (fixed by this plan) — the `ROSTER` is FULL in Lite (same cast as desktop); only `STAGES` are trimmed:**
+  - `roster.js` — **unchanged**: the full `ROSTER` ships in Lite (no `lite` flag, no filter). `BOSS_ROSTER` and `ASSIST_ROSTER` also ship full (Boss Rush + item assists need them). The Lite/desktop cast is identical.
   - `stages.js` — `lite:true` on 5 stages: **goiky** (flat; tutorial forces it, must stay first), **yoyle** (lowgrav), **pillars** (solid), **incin** (lava), **grandplains** (big/scrolling). Order preserved so `STAGES[0]` stays `goiky`.
 - Every test command below is run from the repo root `C:/Users/pkupe/Aardvark/smash-island`.
 
@@ -77,16 +77,17 @@ Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 
 ---
 
-### Task 2: Lite content flags + single-source in-place filter
+### Task 2: Lite stage flags + single-source in-place filter (STAGES only; ROSTER stays full)
+
+> **Content-trim scope (owner decision):** the Lite trim is **STAGES ONLY**. The `ROSTER` is **full** in Lite — same cast as desktop — so this task adds **no** `lite` flag to `roster.js` and **no** roster filter. Only `src/data/stages.js` is flagged and filtered.
 
 **Files:**
 - Create: `src/data/lite-content.js`
-- Modify: `src/data/roster.js` (add `lite:true` to the 12 subset entries in the `ROSTER` table at source rows corresponding to monolith `658-777`; append filter guard at module end)
 - Modify: `src/data/stages.js` (add `lite:true` to the 5 subset entries in `STAGES`, monolith `780-835`; append filter guard at module end)
 - Test: `test/lite/lite-content.test.js`
 **Interfaces:**
 - Consumes: `BUILD` from `src/core/build.js` (Task 1).
-- Produces: `keepLite(list)` → filtered copy; `applyLiteFilterInPlace(list)` → mutates `list` in place to only `lite:true` entries, returns `list`. `ROSTER`/`STAGES` unchanged in the full build; reduced to the subset in the Lite build, evaluated **before** `core/state.js` reads them (roster/stages evaluate before state in the import graph).
+- Produces: `keepLite(list)` → filtered copy; `applyLiteFilterInPlace(list)` → mutates `list` in place to only `lite:true` entries, returns `list`. `STAGES` is unchanged in the full build and reduced to the subset in the Lite build; `ROSTER` is never filtered in any build. The `STAGES` filter is evaluated **before** `core/state.js` reads it (stages evaluate before state in the import graph).
 
 - [ ] **Step 1: Write the failing test**
 ```js
@@ -111,16 +112,13 @@ describe('lite content filter', () => {
     expect(arr).toHaveLength(2);
   });
 
-  it('the data tables carry exactly the 12/5 lite-flagged subset', () => {
-    const liteFighters = ROSTER.filter(r => r.lite === true).map(r => r.name);
-    expect(liteFighters).toEqual([
-      'Firey', 'Leafy', 'Needle', 'Pin', 'Snowball', 'Bomby',
-      'Bubble', 'Teardrop', 'Flower', 'Tennis Ball', 'Gelatin', 'Golf Ball',
-    ]);
+  it('STAGES carries exactly the 5 lite-flagged subset; ROSTER is full (no lite flags)', () => {
     const liteStages = STAGES.filter(s => s.lite === true).map(s => s.id);
     expect(liteStages).toEqual(['goiky', 'yoyle', 'pillars', 'incin', 'grandplains']);
+    // ROSTER is FULL in Lite — the trim is STAGES only, so no fighter carries a
+    // lite flag and the roster is never filtered.
+    expect(ROSTER.some(r => r.lite === true)).toBe(false);
     // full build must NOT be filtered when BUILD.lite is false (vitest default)
-    expect(ROSTER.length).toBeGreaterThan(12);
     expect(STAGES.length).toBeGreaterThan(5);
   });
 });
@@ -150,44 +148,34 @@ export function applyLiteFilterInPlace(list) {
 }
 ```
 
-In `src/data/roster.js`, add `lite:true` to exactly these entries (edit the existing object literals; do not reorder). Firey, Leafy, Needle, Pin, Snowball, Bomby, Bubble, Teardrop, Flower, Tennis Ball are in the first playable block; Gelatin and Golf Ball are in the second block. Example shape of one edit (Firey):
-```js
-{name:"Firey", w:74, color:"#f0521f", play:true, lite:true, arch:"Aggressive zoner",
- kit:{special:"ember", desc:"Ember Spit → arcing fireball; smashes apply burn"}},
-```
-Then append the guard at the **end** of `roster.js` (after the `ROSTER` / `ASSIST_ROSTER` / `BOSS_ROSTER` declarations), importing the flag and helper:
-```js
-import { BUILD } from '../core/build.js';
-import { applyLiteFilterInPlace } from './lite-content.js';
-// Lite trims the playable roster in place to the taster subset. BOSS_ROSTER /
-// ASSIST_ROSTER are intentionally NOT filtered (Boss Rush + assists need them).
-if (BUILD.lite) applyLiteFilterInPlace(ROSTER);
-```
+`src/data/roster.js` is **NOT modified**: the trim is STAGES-only, so the roster carries no `lite` flag and no filter guard — the full cast (plus `BOSS_ROSTER`/`ASSIST_ROSTER`) ships in Lite exactly as on desktop.
 
-In `src/data/stages.js`, add `lite:true` to `goiky`, `yoyle`, `pillars`, `incin`, `grandplains` (edit existing literals), then append:
+In `src/data/stages.js`, add `lite:true` to `goiky`, `yoyle`, `pillars`, `incin`, `grandplains` (edit existing literals; do not reorder), then append the guard at the **end** of the module (after the `STAGES` declaration), importing the flag and helper:
 ```js
 import { BUILD } from '../core/build.js';
 import { applyLiteFilterInPlace } from './lite-content.js';
+// Lite trims STAGES in place to the taster subset. ROSTER is NOT trimmed — the
+// full cast ships in Lite (same as desktop).
 if (BUILD.lite) applyLiteFilterInPlace(STAGES);
 ```
-> Note: this adds a `build.js`/`lite-content.js` import to two previously-leaf data modules. Both new modules are pure zero-side-effect leaves, so no import-time-effect or cycle risk is introduced. The guard runs during `roster.js`/`stages.js` evaluation, i.e. **before** `core/state.js` evaluates `chosen=ROSTER.find(r=>r.play)` and `stage=STAGES[0]`, so the Lite default selections are lite entries and `STAGES[0]` stays `goiky`.
+> Note: this adds a `build.js`/`lite-content.js` import to one previously-leaf data module (`stages.js` only). Both new modules are pure zero-side-effect leaves, so no import-time-effect or cycle risk is introduced. The guard runs during `stages.js` evaluation, i.e. **before** `core/state.js` evaluates `stage=STAGES[0]`, so the Lite default stage is a lite entry and `STAGES[0]` stays `goiky`. `chosen=ROSTER.find(r=>r.play)` is unaffected because `ROSTER` is never filtered.
 
 - [ ] **Step 4: Run tests, verify pass**
 ```
 npx vitest run test/lite/lite-content.test.js
 ```
-Expected: `PASS` — 3 passed. (Full `ROSTER`/`STAGES` untouched because `BUILD.lite` is false under vitest.)
+Expected: `PASS` — 3 passed. (Full `STAGES` untouched because `BUILD.lite` is false under vitest; `ROSTER` is never filtered in any build.)
 
-This task edits shared Plan-A files (`roster.js`/`stages.js`), so it **also gates on the full Plan A harness** (canonical contract §2):
+This task edits a shared Plan-A file (`stages.js`), so it **also gates on the full Plan A harness** (canonical contract §2):
 ```
 npm test
 ```
-Expected: `PASS` — Plan A's entire suite (including its full-split golden parity) stays green with the appended guards, proving the in-place filter is inert when `BUILD.lite` is false.
+Expected: `PASS` — Plan A's entire suite (including its full-split golden parity) stays green with the appended guard, proving the in-place `STAGES` filter is inert when `BUILD.lite` is false.
 
 - [ ] **Step 5: Commit**
 ```
-git add src/data/lite-content.js src/data/roster.js src/data/stages.js test/lite/lite-content.test.js
-git commit -m "feat(lite): lite:true content flags + single-source in-place filter
+git add src/data/lite-content.js src/data/stages.js test/lite/lite-content.test.js
+git commit -m "feat(lite): lite:true STAGES flags + single-source in-place filter (roster stays full)
 
 Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 ```
@@ -903,11 +891,13 @@ Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 
 ### Task 10: Tree-shake verification — no LAN/editor/co-op/music symbols in `dist-lite`
 
+> **Plan D note (netcode stays excluded in Plan C):** Plan C ships the Lite build **without** `net/netcode.js` — the offline taster has no online play, so this test asserts real-netcode markers (`new WebSocket`, `broadcastState`, `sendInput`) are **absent** from `dist-lite`, alongside editor / co-op-planning / music-director / stem-player / manifest. **Plan D** (the online Rooms phase, after C) will later **add** `net/netcode.js` + the relay server + the rooms UI to the Lite build and **amend this test** so netcode is allowed in Lite from Plan D onward (editor / co-op-planning / music-director / stem-player / manifest stay excluded). Do not relax the netcode assertion in Plan C.
+
 **Files:**
 - Create: `test/lite/tree-shake.test.js`
 **Interfaces:**
 - Consumes: a built `dist-lite/` (the test builds it if missing).
-- Produces: an assertion that the Lite bundle contains none of the marker strings unique to excluded features, and that it DOES contain kept markers (Arena/Tutorial/BossRush/WorldCup + SFX), proving exclusion is real and the build isn't empty.
+- Produces: an assertion that the Lite bundle contains none of the marker strings unique to excluded features (LAN/netcode, editor, co-op, music, stats), and that it DOES contain kept markers (Arena/Tutorial/BossRush/WorldCup + SFX), proving exclusion is real and the build isn't empty.
 
 - [ ] **Step 1: Write the failing test**
 ```js
@@ -992,93 +982,77 @@ Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 
 ---
 
-### Task 11: Lite golden-parity subset check (Arena / Tutorial / Boss Rush / World Cup)
+### Task 11: Lite golden-parity subset check (ffa / teams / bossrush / worldcup-inf / ko)
 
-> **Harness ownership (canonical contract §3):** the golden/parity harness is **Plan A's**, lives under `test/harness/`, and is imported by Plan C from the **single path `test/harness/index.js`**. Plan C uses ONLY this surface — `makeApi({ lite })`, `mulberry32(seed)`, `seedRandom(seed)`, `runScriptedMatch({ lite, seed, script })` (returns a `Trace`), `goldenParity(actualTrace, goldenTrace)` (asserts structural equality, throws on mismatch), and `infinityRenderTest(api)`. There is **no** `runMonolith`/`runSplit`, no `tests/golden`, and no `../golden` vs `../tests/golden` split. Goldens are recorded by Plan A's `scripts/record-monolith.mjs` into `test/golden/*.json`; the **Lite** golden is that same recorder run with the Lite subset selected. When `makeApi`/`runScriptedMatch` are called with `lite:true`, the harness automatically yields the trimmed `ROSTER`/`STAGES` via `BUILD.lite` — no manual content patch is needed.
+> **Harness ownership (canonical contract §3):** the golden/parity harness AND the scenarios file are **Plan A's**. The harness lives under `test/harness/` (imported from the **single path `test/harness/index.js`**); the scenarios live in the **single shared `test/scenarios.js`**, from which Plan A derives `LITE_SCENARIOS` (the Lite-subset name filter, now covering **ffa, teams, bossrush, worldcup-inf, ko**). Plan C uses ONLY this surface — `makeApi({ lite })`, `mulberry32(seed)`, `seedRandom(seed)`, `runScriptedMatch({ lite, seed, script })` (returns a `Trace`), `goldenParity(actualTrace, goldenTrace)` (asserts structural equality, throws on mismatch), and `infinityRenderTest(api)`. There is **no** `runMonolith`/`runSplit`, **no separate `test/lite/scenarios.js`**, no `tests/golden`, and no `../golden` vs `../tests/golden` split. Goldens are recorded by Plan A's `scripts/record-monolith.mjs` into `test/golden/*.json`; the **Lite** golden is `test/golden/monolith-golden.lite.json`, that same recorder run over `LITE_SCENARIOS`. When `makeApi`/`runScriptedMatch` are called with `lite:true`, the harness automatically yields the **full `ROSTER` + the trimmed `STAGES`** via `BUILD.lite` — no manual content patch is needed.
 
 **Files:**
-- Create: `test/lite/scenarios.js` (the fixed-seed Lite scenarios, shared by the recorder and the test)
-- Create: `test/golden/lite-parity.json` (recorded artifact, committed; produced by `scripts/record-monolith.mjs --lite`)
+- **Delete:** `test/lite/scenarios.js` — the separate Lite scenarios file is removed. Plan C imports `LITE_SCENARIOS` from the shared `test/scenarios.js` (Plan A owns it): `import { LITE_SCENARIOS as SCENARIOS } from "../scenarios.js"`. One scenarios file, one recorder, one subset filter.
+- Read (recorded artifact, committed; produced by `scripts/record-monolith.mjs --lite`): `test/golden/monolith-golden.lite.json`
 - Create: `test/lite/golden-parity.test.js`
 **Interfaces:**
-- Consumes: **Plan A's** harness via `test/harness/index.js` — `runScriptedMatch({ lite, seed, script })` → `Trace` `{ hud: string[], standings: string[], koCount: number, placements: string[] }`, `goldenParity(actual, golden)`, `makeApi({ lite })`, `infinityRenderTest(api)`, and `mulberry32`/`seedRandom` (the deterministic RNG the harness pins internally from `seed`). Plan A's `scripts/record-monolith.mjs --lite` records `test/golden/lite-parity.json` from `artifacts/V1/index.html` with the `lite:true` subset selected, replaying the shared `test/lite/scenarios.js`.
-- Produces: a recorded-input, fixed-seed parity comparison of the Lite split build (`runScriptedMatch({ lite:true, … })`) vs the Lite golden recorded from the monolith on the trimmed content, across FFA, Teams, Boss Rush, and a World Cup group match (infinite stocks), asserting identical HUD stock/percent text, standings order, KO count, and final placement — with the World Cup Infinity path exercised through the harness's `infinityRenderTest`.
+- Consumes: **Plan A's** harness via the single path `test/harness/index.js` — `runScriptedMatch({ lite, seed, script })` → the canonical `Trace` (schema v1) EXACTLY `{ frames: string[], final: { hudStockPercent: { name:string, stk:number|'INF', pct:number }[], standingsOrder: string[], koCount: number, finalPlacement: string[] } }` (infinite stocks encode as `stk:'INF'`, never the ∞ glyph — the Trace itself never contains the glyph), `goldenParity(actual, golden)` — all from that one import path — plus `LITE_SCENARIOS` from the shared `test/scenarios.js`. Plan A's `scripts/record-monolith.mjs --lite` records `test/golden/monolith-golden.lite.json` from `artifacts/V1/index.html` with the `lite:true` subset selected (full roster + trimmed stages), replaying `LITE_SCENARIOS`.
+- Produces: a recorded-input, fixed-seed parity comparison of the Lite split build (`runScriptedMatch({ lite:true, … })`) vs the Lite golden recorded from the monolith on the same content (full roster + trimmed stages), across the five Lite modes (**ffa, teams, bossrush, worldcup-inf, ko**), asserting identical `final.hudStockPercent` (name/stk/pct), `final.standingsOrder`, `final.koCount`, and `final.finalPlacement`, plus identical per-frame `frames` checksums — with the World-Cup infinite-stock evidence taken from the encoded `stk:'INF'` entry in `final.hudStockPercent` (schema v1: the Trace never contains the ∞ glyph).
 
 - [ ] **Step 1: Write the failing test**
 ```js
 // test/lite/golden-parity.test.js
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { runScriptedMatch, goldenParity, makeApi, infinityRenderTest } from '../harness/index.js'; // Plan A
-import { SCENARIOS } from './scenarios.js';
+// Single harness surface — from the one path test/harness/index.js (Plan A).
+import { runScriptedMatch, goldenParity } from '../harness/index.js';
+// Single shared scenarios file — Plan A owns it; LITE_SCENARIOS is the Lite subset
+// (ffa, teams, bossrush, worldcup-inf, ko). There is NO test/lite/scenarios.js.
+import { LITE_SCENARIOS as SCENARIOS } from '../scenarios.js';
 
-const golden = JSON.parse(readFileSync(new URL('../golden/lite-parity.json', import.meta.url), 'utf8'));
+const golden = JSON.parse(
+  readFileSync(new URL('../golden/monolith-golden.lite.json', import.meta.url), 'utf8'),
+);
 
-describe('Lite golden parity vs monolith (trimmed content)', () => {
+describe('Lite golden parity vs monolith (full roster + trimmed stages)', () => {
   for (const sc of SCENARIOS) {
     it(`${sc.name}: Lite split build matches the monolith on lite content`, async () => {
+      // Trace shape (canonical v1): { frames, final:{ hudStockPercent, standingsOrder, koCount, finalPlacement } }.
       const trace = await runScriptedMatch({ lite: true, seed: sc.seed, script: sc.script });
       // goldenParity throws (structural mismatch) → the test fails with a diff.
       goldenParity(trace, golden[sc.name]);
-      // The World Cup scenario carries an infinite-stock entry — the harness's
-      // Infinity render check must pass (HUD shows ∞, RAF loop survives, no throw).
-      if (sc.name === 'worldcup-group') {
-        infinityRenderTest(await makeApi({ lite: true }));
-        expect(trace.hud.some(line => line.includes('∞'))).toBe(true);
+      // World-Cup infinite-stock evidence: the encoded INF stock in the Trace
+      // (schema v1: the Trace never contains the ∞ glyph). No standalone
+      // infinityRenderTest on an unbooted api — the Trace assertion is sufficient.
+      if (sc.name === 'worldcup-inf') {
+        expect(trace.final.hudStockPercent.some(e => e.stk === 'INF')).toBe(true);
       }
     });
   }
 });
 ```
-Supporting scenario definitions (fixed seed + compact recorded input; deterministic). No content patch — `runScriptedMatch({ lite:true })` yields the trimmed roster/stages automatically via `BUILD.lite`:
-```js
-// test/lite/scenarios.js
-// Each script is a list of steps the harness replays against the sim; the harness
-// pins Math.random via its own mulberry32/seedRandom from `seed`, so team draws
-// and spawns are identical between the monolith recording and the Lite split.
-export const SCENARIOS = [
-  { name: 'ffa',            seed: 0xB5F1, frames: 240, script: [
-      { at: 0,  start: { mode: 'ffa',   count: 4, stocks: 3, stage: 'goiky',       chosen: 'Firey' } },
-      { at: 30, down: ['ArrowRight', 'KeyX'] }, { at: 90, down: ['KeyC'] }, { at: 150, down: ['KeyV'] },
-    ] },
-  { name: 'teams',          seed: 0xB5F2, frames: 240, script: [
-      { at: 0,  start: { mode: 'teams', count: 4, stocks: 3, stage: 'yoyle',       chosen: 'Leafy', teams: '2v2' } },
-      { at: 30, down: ['ArrowLeft', 'KeyX'] }, { at: 120, down: ['ArrowUp', 'KeyC'] },
-    ] },
-  { name: 'bossrush',       seed: 0xB5F3, frames: 300, script: [
-      { at: 0,  start: { mode: 'boss',  count: 1, stocks: 3, stage: 'grandplains', chosen: 'Bomby' } },
-      { at: 40, down: ['ArrowRight', 'KeyX'] }, { at: 160, down: ['KeyC'] },
-    ] },
-  { name: 'worldcup-group', seed: 0xB5F4, frames: 200, script: [
-      { at: 0,  tournament: { size: 1, mode: 'spectate' } }, // group match: f.stocks=Infinity → HUD must show ∞
-    ] },
-];
-```
+The scenarios come from the shared `test/scenarios.js` (Plan A owns it); Plan C creates no scenarios file. `LITE_SCENARIOS` is Plan A's name-filtered subset covering **ffa, teams, bossrush, worldcup-inf, ko** — each entry is the canonical `{ name, seed, script }` (schema v1). No content patch here: `runScriptedMatch({ lite:true })` yields the **full roster + trimmed stages** automatically via `BUILD.lite`, and the harness pins `Math.random` via its own `mulberry32`/`seedRandom` from `seed`, so draws/spawns are identical between the monolith recording and the Lite split.
 
 - [ ] **Step 2: Run it, verify it fails**
 ```
 npx vitest run test/lite/golden-parity.test.js
 ```
-Expected: `FAIL` — `Cannot find module '../golden/lite-parity.json'` (Lite golden not recorded yet).
+Expected: `FAIL` — `Cannot find module '../golden/monolith-golden.lite.json'` (Lite golden not recorded yet).
 
-- [ ] **Step 3: Record the Lite golden from the monolith on the trimmed content** — use Plan A's recorder with the Lite subset (Plan C creates NO separate recorder; the harness/recorder are Plan A's). `scripts/record-monolith.mjs --lite` drives `artifacts/V1/index.html` with the `lite:true` subset selected, replaying `test/lite/scenarios.js`, and writes `test/golden/lite-parity.json`:
+- [ ] **Step 3: Record the Lite golden from the monolith on the trimmed content** — use Plan A's recorder with the Lite subset (Plan C creates NO separate recorder; the harness/recorder/scenarios are Plan A's). `scripts/record-monolith.mjs --lite` drives `artifacts/V1/index.html` with the `lite:true` subset selected (full roster + trimmed stages), replaying `LITE_SCENARIOS` from the shared `test/scenarios.js`, and writes `test/golden/monolith-golden.lite.json`:
 ```
 node scripts/record-monolith.mjs --lite
 ```
-Expected: prints one `captured <scenario>:` line per scenario (`ffa`, `teams`, `bossrush`, `worldcup-group`) and `wrote test/golden/lite-parity.json`, exit 0. The `worldcup-group` capture must include HUD lines containing `∞` (proves the monolith's own Infinity guard is the reference, not a crash).
-> If Plan A's `scripts/record-monolith.mjs` does not yet accept `--lite` (subset selection + Plan C's scenario file), that flag is a small extension to Plan A's recorder — add it in Plan A, not by re-introducing a `runMonolith` clone here. The Lite golden MUST come from the same monolith recorder as the full goldens, into the same `test/golden/` directory.
+Expected: prints one `captured <scenario>:` line per scenario (`ffa`, `teams`, `bossrush`, `worldcup-inf`, `ko`) and `wrote test/golden/monolith-golden.lite.json`, exit 0. For `worldcup-inf` the recorder exercises the monolith's own Infinity guard (its `hudStockText()` DOM contains the ∞ glyph, proving the reference is the guard and not a crash), but the recorded Trace encodes the infinite-stock entry as `final.hudStockPercent[i].stk === 'INF'` — the Trace never contains the ∞ glyph (schema v1).
+> If Plan A's `scripts/record-monolith.mjs` does not yet accept `--lite` (subset selection + `LITE_SCENARIOS`), that flag is a small extension to Plan A's recorder — add it in Plan A, not by re-introducing a `runMonolith` clone here. The Lite golden MUST come from the same monolith recorder as the full goldens, into the same `test/golden/` directory, from the same shared `test/scenarios.js`.
 
 - [ ] **Step 4: Run tests, verify pass**
 ```
 npx vitest run test/lite/golden-parity.test.js
 ```
-Expected: `PASS` — 4 scenarios green (`ffa`, `teams`, `bossrush`, `worldcup-group`), with the `worldcup-group` `infinityRenderTest` + `∞` sub-assertion passing. A `goldenParity` throw here is a real behavioral divergence (Infinity guard on the wrong side, a snapshotted `hazardT`, a slice-dropped branch) — investigate the module, never loosen the assertion.
-> Reasoning chain: Plan A's own golden check proves `full-split ≡ monolith`; this task proves `lite ≡ monolith-on-subset` via the same harness/recorder. Together they establish `lite ≡ monolith` for the trimmed content across all four Lite modes.
+Expected: `PASS` — 5 scenarios green (`ffa`, `teams`, `bossrush`, `worldcup-inf`, `ko`), with the `worldcup-inf` `stk:'INF'` Trace sub-assertion passing. A `goldenParity` throw here is a real behavioral divergence (Infinity guard on the wrong side, a snapshotted `hazardT`, a slice-dropped branch) — investigate the module, never loosen the assertion.
+> Reasoning chain: Plan A's own golden check proves `full-split ≡ monolith`; this task proves `lite ≡ monolith-on-subset` via the same harness/recorder/scenarios. Together they establish `lite ≡ monolith` for the lite content across all five Lite modes.
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 5: Commit** (the separate `test/lite/scenarios.js` is deleted — `git rm` it if it exists in the tree)
 ```
-git add test/lite/scenarios.js test/golden/lite-parity.json test/lite/golden-parity.test.js
-git commit -m "test(lite): golden parity vs monolith on trimmed content (FFA/Teams/BossRush/WorldCup)
+git rm --ignore-unmatch test/lite/scenarios.js
+git add test/golden/monolith-golden.lite.json test/lite/golden-parity.test.js
+git commit -m "test(lite): golden parity vs monolith on lite content (ffa/teams/bossrush/worldcup-inf/ko)
 
 Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 ```
@@ -1175,8 +1149,8 @@ Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>"
 
 ## Self-Review
 
-- **Cross-plan contract & execution order.** This plan is reconciled to **Canonical Interface Contract v1** and executes **last (A → B → C)**. Plan-A-owned assets it only *consumes* (creates none): `src/core/build.js` (`BUILD.lite`, Task 1), `src/core/handler-coverage.js` (`assertHandlerCoverage(win, root)`, Task 7), the single `test/` root with Plan A's one Vitest `test` block (no second `vitest.config.js`, no `tests/` plural), and the golden/parity harness under `test/harness/` imported from `test/harness/index.js` with goldens in `test/golden/*.json` recorded by `scripts/record-monolith.mjs` (Task 11). Plan-B-owned assets it only *consumes*: the post-B `audio/audio.js` facade + `setMusicDirector()` registry and the `music-director.js`/`stem-player.js`/`manifest.js` engine (Task 5). Every Plan-C task that edits a shared/Plan-A file (Task 2 `roster.js`/`stages.js`; Task 9 `vite.config.js`/`package.json`) additionally gates on the full `npm test` harness (contract §2).
-- **Spec coverage.** Every Lite item maps to a task: consuming Plan A's `BUILD.lite` + the Lite `__LITE__:true` `define` override (Tasks 1, 9); `index.lite.html` trimmed shell dropping editor/lobby/co-op/test screens while keeping the id/`.screen.active` contract (Task 6); `src/main.lite.js` importing only the Lite module set and never registering a music director (Task 8); `vite.config.js` full+lite targets + `dev:lite`/`build:lite` → `dist-lite/` (Task 9); roster/stage `lite:true` flags with single-source in-place filter (Task 2); verifying the post-B `audio/audio.js` facade no-ops music while SFX is retained (Task 5); the per-build handler-coverage assertion passing for the Lite shell via Plan A's shared module (Tasks 7, 8, 12); the tree-shake verification that no LAN/editor/co-op/music (incl. `music-director`/`stem-player`/`manifest`) symbols ship (Task 10); the Lite golden-parity subset check for Arena/Tutorial/Boss-Rush/World-Cup via `runScriptedMatch({ lite:true })` + `goldenParity` (Task 11); and plain-browser no-console-errors boot (Task 12). "No music" is structural, not a flag: `main.lite.js` never imports `music-director.js` and never calls `setMusicDirector`, so `_director` stays null; SFX (`bus.js`/`sfx.js`) is untouched and no task hard-codes SFX-on.
+- **Cross-plan contract & execution order.** This plan is reconciled to **Canonical Interface Contract v1** and executes **after A and B (order A → B → C → D)** — Plan C is the **offline** Lite taster and is **not** last; the online **Rooms** feature is **Plan D** (after C), which adds `net/netcode.js` + a relay server and amends the tree-shake test (Task 10). Plan-A-owned assets Plan C only *consumes* (creates none): `src/core/build.js` (`BUILD.lite`, Task 1), `src/core/handler-coverage.js` (`assertHandlerCoverage(win, root)`, Task 7), the single `test/` root with Plan A's one Vitest `test` block (no second `vitest.config.js`, no `tests/` plural), the single shared scenarios file `test/scenarios.js` (Plan A owns `LITE_SCENARIOS` = ffa/teams/bossrush/worldcup-inf/ko; there is **no** `test/lite/scenarios.js`), and the golden/parity harness under `test/harness/` imported from `test/harness/index.js` with goldens in `test/golden/*.json` (the Lite golden is `test/golden/monolith-golden.lite.json`) recorded by `scripts/record-monolith.mjs` (Task 11). Plan-B-owned assets it only *consumes*: the post-B `audio/audio.js` facade + `setMusicDirector()` registry and the `music-director.js`/`stem-player.js`/`manifest.js` engine (Task 5). Every Plan-C task that edits a shared/Plan-A file (Task 2 `stages.js`; Task 9 `vite.config.js`/`package.json`) additionally gates on the full `npm test` harness (contract §2).
+- **Spec coverage.** Every Lite item maps to a task: consuming Plan A's `BUILD.lite` + the Lite `__LITE__:true` `define` override (Tasks 1, 9); `index.lite.html` trimmed shell dropping editor/lobby/co-op/test screens while keeping the id/`.screen.active` contract (Task 6); `src/main.lite.js` importing only the Lite module set and never registering a music director (Task 8); `vite.config.js` full+lite targets + `dev:lite`/`build:lite` → `dist-lite/` (Task 9); stage `lite:true` flags (STAGES only; the `ROSTER` stays full) with single-source in-place filter (Task 2); verifying the post-B `audio/audio.js` facade no-ops music while SFX is retained (Task 5); the per-build handler-coverage assertion passing for the Lite shell via Plan A's shared module (Tasks 7, 8, 12); the tree-shake verification that no LAN/netcode/editor/co-op/music (incl. `music-director`/`stem-player`/`manifest`) symbols ship — Plan D later re-adds `net/netcode.js` and amends this test (Task 10); the Lite golden-parity subset check across the five Lite modes (ffa/teams/bossrush/worldcup-inf/ko) via `runScriptedMatch({ lite:true })` + `goldenParity` against `test/golden/monolith-golden.lite.json` (Task 11); and plain-browser no-console-errors boot (Task 12). "No music" is structural, not a flag: `main.lite.js` never imports `music-director.js` and never calls `setMusicDirector`, so `_director` stays null; SFX (`bus.js`/`sfx.js`) is untouched and no task hard-codes SFX-on.
 - **Placeholders.** None. Every code step shows complete, real code; every command shows concrete expected output. Extraction-style verbatim monolith bodies are avoided — Tasks 2 and 6 specify exact edits/line-ranges and small glue instead of reproducing tables/markup.
 - **Name/type consistency vs the contract + map.** Consumed symbols use the exact export names: `applySnapshot`/`serializeState`/`NET`/`autoJoinFromLink`/`openLobby` (netcode), `captureTeamPlan`/`refreshTeamChat` (coop-planning); post-B audio facade `setMusicDirector`/`startMusic`/`stopMusic`/`setIntensity`/`tickMusic`/`SFX` (audio) with `sampleMatchIntensity`/`koStinger` belonging only to the excluded `music-director.js`; `startMatch`/`beginMatchNow` (arena), `startBossRush` (boss-rush), `startTournament`/`openTournamentSetup`/`kickOffTournament`/`endTournament`/`simRestOfRound` (tournament), `openTutorial`/`startTutorial`/`finishTutorial`/`tutorialSeen` (tutorial), `buildBoard` (roster-screen), `resetKeys`/`captureRemapKey`/`isListening` (controls-remap), `resize` (draw), `initDom`/`down`/`KEYS` (state), `go` (router); harness `makeApi`/`runScriptedMatch`/`goldenParity`/`infinityRenderTest`/`mulberry32`/`seedRandom` from `test/harness/index.js`; `assertHandlerCoverage(win, root)`/`collectHandlerIdentifiers`/`HandlerCoverageError` from `core/handler-coverage.js`. The frame counter is `rt.hazardT` (never `state.hazardT`). The 12-symbol Lite bridge is a strict subset of the map's `globalHandlerBridge`.
-- **Load-bearing correctness decisions.** (1) Per-mode build not single multi-page build, because `engine/fighter.js`→`net/netcode.js` and `modes/arena.js`+`ui/roster-screen.js`→`modes/coop-planning.js` are *static* imports that would leak into a shared Lite chunk — resolved by the `resolveId` redirect to `.lite` stubs. (2) The content filter runs during `roster.js`/`stages.js` evaluation (before `core/state.js` reads `ROSTER`/`STAGES`) and mutates the arrays in place, honoring the ESM live-binding rule. (3) `#teamChatPanel` is retained as a hidden placeholder because `ui/roster-screen.js syncModeUI` reads `panel.style` (monolith line 1119), preventing a null-deref without forking roster-screen. (4) The music engine tree-shakes out because Plan B's facade holds a `setMusicDirector` registry with no static `music-director`/`stem-player`/`manifest` import and `main.lite.js` never registers a director — leaving `_director` null. (5) Boss Rush/World Cup remain valid on 12 fighters because tournament team-building samples `ROSTER` with replacement (monolith line 1410), and `BOSS_ROSTER`/`ASSIST_ROSTER` are left unfiltered.
+- **Load-bearing correctness decisions.** (1) Per-mode build not single multi-page build, because `engine/fighter.js`→`net/netcode.js` and `modes/arena.js`+`ui/roster-screen.js`→`modes/coop-planning.js` are *static* imports that would leak into a shared Lite chunk — resolved by the `resolveId` redirect to `.lite` stubs. (2) The content filter is STAGES-only: it runs during `stages.js` evaluation (before `core/state.js` reads `STAGES[0]`) and mutates the `STAGES` array in place, honoring the ESM live-binding rule; `ROSTER` is never filtered (full cast in Lite). (3) `#teamChatPanel` is retained as a hidden placeholder because `ui/roster-screen.js syncModeUI` reads `panel.style` (monolith line 1119), preventing a null-deref without forking roster-screen. (4) The music engine tree-shakes out because Plan B's facade holds a `setMusicDirector` registry with no static `music-director`/`stem-player`/`manifest` import and `main.lite.js` never registers a director — leaving `_director` null. (5) Boss Rush/World Cup are trivially valid because the `ROSTER` is **full** in Lite (no roster trim at all) and `BOSS_ROSTER`/`ASSIST_ROSTER` are likewise unfiltered; the only content difference from desktop is the trimmed `STAGES` set.

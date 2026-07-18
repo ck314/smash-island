@@ -9,13 +9,31 @@
 
 **Tech Stack:** Vite 5, Electron 31, electron-builder 25, ESLint 9 (flat config), Vitest 2 + jsdom, `@fontsource/fredoka` + `@fontsource-variable/jetbrains-mono`. Node ≥ 18.19 (Vite 5 / ESM floor).
 
-**Execution order & cross-plan interfaces (Canonical Contract v1):** These three plans land in a fixed order — **Plan A (this plan) → Plan B (layered music) → Plan C (web-Lite)**. Plan A runs first and *produces* three interfaces that Plans B and C consume; do not rename or duplicate them downstream:
+**Execution order & cross-plan interfaces (Canonical Contract v1):** These plans land in a fixed order — **Plan A (this plan) → Plan B (layered music) → Plan C (web-Lite, offline) → Plan D (online rooms, last)**. Plan A runs first and *produces* interfaces that Plans B, C, and D consume (Plan D also reuses `net/netcode.js`, the `core/state.js` setters, `handler-coverage.js`, and the `test/harness` API); do not rename or duplicate them downstream:
 
 - **`src/core/build.js`** — `export const BUILD = { lite: __LITE__ };`, with this plan's base `vite.config.js` setting `define: { __LITE__: JSON.stringify(false) }`. Plan B and Plan C read the flag via `import { BUILD } from '../core/build.js'` (adjusting relative depth). Plan C's Lite build overrides the define to `JSON.stringify(true)`; Plan C does **not** create `build.js`.
 - **The `test/harness/index.js` barrel** — the single import path Plans B and C use, re-exporting `makeApi({ lite })`, `mulberry32`, `seedRandom`, `runScriptedMatch({ lite, seed, script })`, `goldenParity`, `infinityRenderTest`. There is exactly one test root (`test/`, singular) and one Vitest config (the `test` key inside `vite.config.js`, `environment: 'jsdom'`, `include: ['test/**/*.test.js']`); B and C add no second `vitest.config.js` and no `tests/` (plural) tree. Goldens are recorded by `scripts/record-monolith.mjs` into `test/golden/`.
 - **`src/core/handler-coverage.js`** — `collectHandlerIdentifiers(root)`, `assertHandlerCoverage(win, root)` (throws `HandlerCoverageError`), and `class HandlerCoverageError`. This plan's `ui/global-actions.js` and full `src/main.js` import and call it; Plan C's `src/main.lite.js` imports the **same** function (it defines no own copy).
 
 Audio stays as the monolith's `audio/audio.js` in this plan (see the "Behavior identical to monolith except music" constraint below). The layered facade/registry (`setMusicDirector`, `music-director.js`) is a **Plan B** deliverable; Plan C assumes the post-Plan-B audio module layout.
+
+**Contract §3 addendum — Canonical Scripted-Match Schema v1 (Plan A owns it; Plan C conforms).** This pins the exact `script` grammar `runScriptedMatch` consumes (Task 32) and the exact `Trace` it returns, so Plan C's Lite parity replays the *identical* `test/scenarios.js` and diffs the same Trace shape.
+
+- **Scenario** = `{ name:string, seed:number, script: Step[] }` (the shape of every entry in the shared `test/scenarios.js`, recorded by `scripts/record-monolith.mjs`).
+- **Step** = an integer `at` (0-based frame index) plus **exactly one** action key:
+  - `{ at, start: { mode:'ffa'|'teams'|'bossrush'|'worldcup', count?, stage?, chosen?, teams? } }` — writes those `SETTINGS` and calls the mode-aware starter (`ffa`/`teams`→`startMatch()`, `bossrush`→`startBossRush()`, `worldcup`→`startTournament()`/`watchFixture()` as the monolith does). Exactly one `start` **or** one `tournament` step, at `at:0`.
+  - `{ at, tournament: { size, mode:'spectate'|'normal' } }` — World Cup entry.
+  - `{ at, down: [KeyCode…] }` / `{ at, up: [KeyCode…] }` — `KeyCode` = DOM `event.code` strings (`ArrowRight`, `KeyX`, …); set/clear those keys in the **persistent** `down` boolean map from frame `at` onward (held until an `up`, never a one-frame `Object.assign`).
+- **Trace** (returned by `runScriptedMatch({ lite, seed, script })`, and the recorded golden shape) is EXACTLY:
+  ```
+  { frames: string[],                       // per-frame checksum
+    final: {
+      hudStockPercent: { name:string, stk:number|'INF', pct:number }[],  // infinite stocks encode as stk:'INF', NOT the glyph U+221E
+      standingsOrder: string[],
+      koCount: number,
+      finalPlacement: string[] } }
+  ```
+  The Trace itself **never** contains the ∞ glyph (U+221E). The infinity-glyph evidence for the World-Cup infinite-stock case comes from `infinityRenderTest(await makeApi({lite}))` (asserts `api.hudStockText()` contains the glyph in DOM text) **or** from `trace.final.hudStockPercent.some(e => e.stk === "INF")`.
 
 ## Global Constraints
 
@@ -278,8 +296,9 @@ release/
 - Create: `test/helpers/harness.js`
 - Create: `test/helpers/load-monolith.js`
 - Create: `src/core/handler-coverage.js` (shared production leaf — consumed by `ui/global-actions.js`, `main.js`, and Plan C's `main.lite.js`; created here so the harness re-exports it)
+- Create: `test/scenarios.js` (the shared Canonical-Schema-v1 scenario list — replayed **identically** by `scripts/record-monolith.mjs` against the monolith and by `runScriptedMatch` against the modules; Plan C reuses this exact file)
 - Create: `scripts/record-monolith.mjs`
-- Create: `test/golden/monolith-golden.json` (generated artifact, committed)
+- Create: `test/golden/monolith-golden.json` + `test/golden/monolith-golden.lite.json` (generated artifacts, committed; `.lite.json` via `--lite`)
 - Create: `test/modules-eval.test.js`
 - Create: `test/harness.selfcheck.test.js`
 **Interfaces:**
@@ -441,12 +460,15 @@ export function domContract(doc, ids) {
   expect(missing, `missing DOM ids: ${missing.join(', ')}`).toEqual([]);
 }
 
-// Structural equality, throws on mismatch. Accepts either a raw end-state snapshot (the golden.json
-// shape) or a Trace from runScriptedMatch ({ frames:[...], final:<snapshot> }); when both sides carry
-// a per-frame `frames` array it is compared too.
+// Compares the CANONICAL SCRIPTED-MATCH Trace v1 (see the header "Contract §3 addendum"): structural
+// equality of `final` (hudStockPercent[{name,stk,pct}] + standingsOrder + koCount + finalPlacement)
+// and, when both sides carry it, the per-frame `frames` checksum array. Throws on mismatch. Accepts
+// either a full Trace ({ frames:[...], final:<snapshot> }) or a bare end-state snapshot (golden.json
+// legacy shape). INFINITE STOCKS ENCODE AS THE STRING "INF" on both sides — never the ∞ glyph
+// (U+221E); the Trace carries no glyph, so a glyph appearing here is a bug, not a match.
 export function goldenParity(actual, golden) {
   const a = actual.final ?? actual, g = golden.final ?? golden;
-  expect(a.hudStockPercent).toEqual(g.hudStockPercent);
+  expect(a.hudStockPercent).toEqual(g.hudStockPercent);  // stk is number|'INF'
   expect(a.standingsOrder).toEqual(g.standingsOrder);
   expect(a.koCount).toEqual(g.koCount);
   expect(a.finalPlacement).toEqual(g.finalPlacement);
@@ -519,38 +541,138 @@ function stub2d() {
 }
 ```
 
-`scripts/record-monolith.mjs`:
+`test/scenarios.js` (the shared Canonical-Schema-v1 scenario list — the SAME file drives the monolith recorder and the module-side `runScriptedMatch`, so the two Traces line up frame-for-frame; each entry is `{ name, seed, script: Step[] }` per the header "Contract §3 addendum"):
 ```js
-// node scripts/record-monolith.mjs > test/golden/monolith-golden.json
-import { loadMonolith } from '../test/helpers/load-monolith.js';
+// Canonical Scripted-Match Schema v1. Step = { at, <one of: start|tournament|down|up> }.
+//   start.mode ∈ 'ffa'|'teams'|'bossrush'|'worldcup'; exactly one start/tournament at at:0.
+//   down/up carry DOM event.code strings, held in the persistent `down` map until released.
+export const SCENARIOS = [
+  {
+    name: 'ffa', seed: 0xC0FFEE,
+    script: [
+      { at: 0, start: { mode: 'ffa', count: 5, stage: 0 } },
+      { at: 20, down: ['ArrowRight'] },          // p1 walks right, held
+      { at: 60, down: ['KeyX'] },                // + attack held
+      { at: 90, up: ['ArrowRight', 'KeyX'] },    // release both
+      { at: 400 },                               // advance to frame 400, no input change
+    ],
+  },
+  {
+    name: 'teams', seed: 0xC0FFEE,
+    script: [
+      { at: 0, start: { mode: 'teams', count: 4, teams: [0, 0, 1, 1] } },
+      { at: 30, down: ['ArrowLeft'] },
+      { at: 120, up: ['ArrowLeft'] },
+      { at: 300 },
+    ],
+  },
+  {
+    name: 'bossrush', seed: 0xC0FFEE,
+    script: [
+      { at: 0, start: { mode: 'bossrush', count: 1 } },
+      { at: 40, down: ['KeyC'] },                // up-special toward the boss
+      { at: 70, up: ['KeyC'] },
+      { at: 300 },
+    ],
+  },
+  {
+    name: 'worldcup-inf', seed: 0xC0FFEE,        // World-Cup spectate → infinite stocks (stk:'INF')
+    script: [
+      { at: 0, tournament: { size: 8, mode: 'spectate' } },
+      { at: 200 },
+    ],
+  },
+  {
+    name: 'ko', seed: 0x1234,                    // short-stock FFA driven to at least one KO
+    script: [
+      { at: 0, start: { mode: 'ffa', count: 2, stage: 0 } },
+      { at: 10, down: ['ArrowRight', 'KeyX'] },  // pin + hammer p2 off the edge
+      { at: 250, up: ['ArrowRight', 'KeyX'] },
+      { at: 500 },
+    ],
+  },
+];
 
-function snapshot(win) {
+// The Lite scenario list Plan C records with `--lite`. Same schema, same file. Because the Lite trim
+// is STAGES-ONLY (the roster is the full desktop cast in Web Lite), Lite parity covers ALL FOUR Lite
+// modes — ffa, teams, bossrush, worldcup-inf — plus ko; only the STAGE each scenario selects narrows
+// to the flagged Lite subset. LITE_SCENARIOS therefore lists the same five names as SCENARIOS.
+export const LITE_SCENARIOS = SCENARIOS.filter((s) => ['ffa', 'teams', 'bossrush', 'worldcup-inf', 'ko'].includes(s.name));
+```
+
+`scripts/record-monolith.mjs` (replays `test/scenarios.js` against the MONOLITH and records golden Traces; `--lite` selects `LITE_SCENARIOS` but replays the IDENTICAL schema so goldens line up):
+```js
+// Full:  node scripts/record-monolith.mjs            -> test/golden/monolith-golden.json
+// Lite:  node scripts/record-monolith.mjs --lite     -> test/golden/monolith-golden.lite.json
+import { writeFileSync } from 'node:fs';
+import { loadMonolith } from '../test/helpers/load-monolith.js';
+import { SCENARIOS, LITE_SCENARIOS } from '../test/scenarios.js';
+
+const LITE = process.argv.includes('--lite');
+
+// MUST match boot-api.js frameChecksum() byte-for-byte so Trace.frames compare monolith↔modules.
+const checksum = (w) =>
+  [...w.fighters].map((f) => Math.round((f.x || 0) + (f.y || 0) + (f.pct || 0))).join(',');
+
+// Canonical Trace `final` snapshot (header Contract §3 addendum): stk is number|'INF' (never ∞).
+function snapshot(w) {
   return {
-    hudStockPercent: [...win.fighters].map((f) => ({
-      n: f.name, stk: f.stocks === Infinity ? 'INF' : f.stocks, pct: Math.round(f.pct),
+    hudStockPercent: [...w.fighters].map((f) => ({
+      name: f.name, stk: f.stocks === Infinity ? 'INF' : f.stocks, pct: Math.round(f.pct),
     })),
-    standingsOrder: [...win.fighters].slice()
+    standingsOrder: [...w.fighters].slice()
       .sort((a, b) => (b.stocks === Infinity ? 0 : b.stocks) - (a.stocks === Infinity ? 0 : a.stocks))
       .map((f) => f.name),
-    koCount: win.fighters.reduce((s, f) => s + (f.killCount || 0), 0),
-    finalPlacement: [...win.fighters].map((f) => ({ n: f.name, p: f.placement ?? null })),
+    koCount: w.fighters.reduce((s, f) => s + (f.killCount || 0), 0),
+    finalPlacement: [...w.fighters].slice()
+      .sort((a, b) => (a.placement ?? 1e9) - (b.placement ?? 1e9)).map((f) => f.name),
   };
 }
+
+// Dispatch ONE Step against the monolith window — mirrors boot-api.js dispatchStep() exactly.
+function dispatchStep(w, step) {
+  if (step.start) {
+    const s = step.start;
+    w.SETTINGS.mode = s.mode;
+    if (s.count != null) w.SETTINGS.count = s.count;
+    if (s.stage != null) w.SETTINGS.stage = s.stage;
+    if (s.chosen != null) w.SETTINGS.chosen = s.chosen;
+    if (s.teams != null) w.SETTINGS.teams = s.teams;
+    if (s.mode === 'bossrush') w.startBossRush();
+    else if (s.mode === 'worldcup') w.startTournament();
+    else w.startMatch();                                    // ffa | teams
+  } else if (step.tournament) {
+    w.SETTINGS.mode = 'worldcup';
+    w.TOURNEY_SETUP_SIZE = step.tournament.size;
+    w.TOURNEY_SETUP_MODE = step.tournament.mode;
+    if (step.tournament.mode === 'spectate') w.watchFixture(); else w.startTournament();
+  } else {
+    // down/up carry DOM event.code strings into the SAME `down` map the monolith's input reads.
+    if (step.down) for (const code of step.down) w.down[code] = true;
+    if (step.up) for (const code of step.up) w.down[code] = false;
+  }
+}
+
+function replay(scenario) {
+  const { window: w, restore } = loadMonolith(scenario.seed);
+  const steps = [...scenario.script].sort((a, b) => a.at - b.at);
+  const lastAt = steps.reduce((m, s) => Math.max(m, s.at), 0);
+  const frames = [];
+  for (let at = 0; at <= lastAt; at++) {
+    for (const s of steps) if (s.at === at) dispatchStep(w, s);
+    w.step?.();
+    frames.push(checksum(w));
+  }
+  restore();
+  return { frames, final: snapshot(w) };  // the canonical Trace
+}
+
 const out = {};
-{
-  const { window: w } = loadMonolith(0xC0FFEE);
-  w.SETTINGS.mode = 'ffa'; w.SETTINGS.count = 5; w.SETTINGS.stocks = 3; w.startMatch();
-  for (let i = 0; i < 400; i++) w.step?.();
-  out.ffa = snapshot(w);
-}
-{
-  const { window: w } = loadMonolith(0xC0FFEE);
-  w.SETTINGS.mode = 'ffa'; w.startMatch();
-  w.fighters.forEach((f) => { f.stocks = Infinity; });
-  for (let i = 0; i < 200; i++) w.step?.();
-  out.worldcup = snapshot(w);
-}
-process.stdout.write(JSON.stringify(out, null, 2) + '\n');
+for (const sc of (LITE ? LITE_SCENARIOS : SCENARIOS)) out[sc.name] = replay(sc);
+writeFileSync(
+  LITE ? 'test/golden/monolith-golden.lite.json' : 'test/golden/monolith-golden.json',
+  JSON.stringify(out, null, 2) + '\n',
+);
 ```
 
 `test/modules-eval.test.js` (auto-globs every `src/` file; the load-order-agnostic zero-side-effect gate re-run after every stage):
@@ -576,7 +698,7 @@ describe('module evaluation has zero DOM/audio/net side effects', () => {
 });
 ```
 
-- [ ] **Step 4: Run tests, verify pass** — `npm test -- harness.selfcheck` → `Tests 2 passed`. Then `node scripts/record-monolith.mjs > test/golden/monolith-golden.json`; confirm non-empty `ffa.hudStockPercent` and `worldcup`. `npm test -- modules-eval` passes (`src/core/build.js` + `src/core/handler-coverage.js` + the placeholder `main.js` present, all side-effect-free at eval).
+- [ ] **Step 4: Run tests, verify pass** — `npm test -- harness.selfcheck` → `Tests 2 passed`. Then `node scripts/record-monolith.mjs` (writes `test/golden/monolith-golden.json`) and `node scripts/record-monolith.mjs --lite` (writes `test/golden/monolith-golden.lite.json`); confirm each keys every scenario name (`ffa`, `teams`, `bossrush`, `worldcup-inf`, `ko` for full; `LITE_SCENARIOS` for lite — the SAME five names, since the Lite trim is stages-only and Lite parity covers all four modes + ko) with a non-empty `frames` array and a `final.hudStockPercent` (and that `worldcup-inf` carries `stk:'INF'`). The Lite golden `test/golden/monolith-golden.lite.json` is (re)recorded from `LITE_SCENARIOS` via `record-monolith.mjs --lite` whenever these scenarios change. `npm test -- modules-eval` passes (`src/core/build.js` + `src/core/handler-coverage.js` + the placeholder `main.js` present, all side-effect-free at eval).
 - [ ] **Step 5: Commit** — `git add -A && git commit -m "harness: vitest+jsdom checks (Infinity/handler/aliasing/golden) + monolith golden baseline"`
 
 ---
@@ -1983,27 +2105,30 @@ import * as SP from '../src/engine/specials.js';
 import { BUILD } from '../src/core/build.js';
 import { seedRandom } from './helpers/prng.js';
 
+// The canonical Trace `final` snapshot (header Contract §3 addendum). stk is number|'INF' (an
+// infinite stock is the STRING "INF", never the ∞ glyph); finalPlacement/standingsOrder are name[].
 function snapshotOf(state) {
   return {
-    hudStockPercent: [...state.fighters].map((f) => ({ n: f.name, stk: f.stocks === Infinity ? 'INF' : f.stocks, pct: Math.round(f.pct) })),
+    hudStockPercent: [...state.fighters].map((f) => ({ name: f.name, stk: f.stocks === Infinity ? 'INF' : f.stocks, pct: Math.round(f.pct) })),
     standingsOrder: [...state.fighters].slice().sort((a, b) => (b.stocks === Infinity ? 0 : b.stocks) - (a.stocks === Infinity ? 0 : a.stocks)).map((f) => f.name),
     koCount: state.fighters.reduce((s, f) => s + (f.killCount || 0), 0),
-    finalPlacement: [...state.fighters].map((f) => ({ n: f.name, p: f.placement ?? null })),
+    finalPlacement: [...state.fighters].slice().sort((a, b) => (a.placement ?? 1e9) - (b.placement ?? 1e9)).map((f) => f.name),
   };
 }
 
 let frames = 0, drawThrow = false;
 // `lite` mirrors BUILD.lite (src/core/build.js). Plan A's base build is full (BUILD.lite===false),
-// so makeApi() defaults to the full ROSTER/STAGES; Plan B/C pass { lite:true } to boot the trimmed
-// set the Lite build selects at compile time. When lite, the roster/stages narrow to the flagged
-// subset (Plan C tags the Lite entries; Plan A falls back to the full set if none are tagged yet).
+// so makeApi() defaults to the full STAGES; Plan B/C pass { lite:true } to boot the trimmed STAGE
+// subset the Lite build selects at compile time. LITE TRIM IS STAGES-ONLY: the ROSTER is always the
+// FULL cast (Web Lite ships the same roster as desktop), so it is never filtered. Only STAGES carry a
+// `lite` flag and narrow to the flagged subset (Plan C tags the Lite stages; Plan A falls back to the
+// full set if none are tagged yet).
 export function makeApi({ lite = false } = {}) {
   const useLite = lite || BUILD.lite;
   document.body.innerHTML = '<canvas id="cv"></canvas><div id="hud" class="active"></div><div id="standings"></div>';
   S.initDom();
   S.SETTINGS.lite = useLite;
-  const liteRoster = ROSTER.filter((r) => r.lite);
-  const roster = useLite && liteRoster.length ? liteRoster : ROSTER;
+  const roster = ROSTER;                                    // FULL roster in Lite AND desktop — trim is stages-only
   const liteStages = STAGES.filter((s) => s.lite);
   const stages = useLite && liteStages.length ? liteStages : STAGES;
   return {
@@ -2012,7 +2137,13 @@ export function makeApi({ lite = false } = {}) {
     frameCount: () => frames,
     async runFrames(n) { for (let i = 0; i < n; i++) { try { F.step(); if (drawThrow) { drawThrow = false; throw new Error('injected'); } D.draw(); HUD.updateHUD(); } catch (e) { console.error(e); } frames++; } },
     runFramesSync(n) { for (let i = 0; i < n; i++) { F.step(); D.draw(); HUD.updateHUD(); frames++; } },
+    // Set/clear DOM event.code keys in the PERSISTENT down map (held until released — never a
+    // one-frame Object.assign). pressKeys/releaseKeys are the down/up Step primitives.
+    pressKeys: (codes) => { for (const c of codes || []) S.down[c] = true; },
+    releaseKeys: (codes) => { for (const c of codes || []) S.down[c] = false; },
     applyInput: (input) => Object.assign(S.down, input || {}),
+    // The per-frame checksum recorded into Trace.frames — MUST stay byte-identical to
+    // scripts/record-monolith.mjs's checksum() so module↔monolith Traces compare frame-for-frame.
     frameChecksum: () => S.fighters.map((f) => Math.round((f.x || 0) + (f.y || 0) + (f.pct || 0))).join(','),
     snapshot: () => snapshotOf(S),
     buildFighters: () => F.buildFighters(),
@@ -2023,7 +2154,32 @@ export function makeApi({ lite = false } = {}) {
     drawnFighterCount: () => S.fighters.length,
     simulateApplySnapshot: (n) => S.replaceArr(S.fighters, S.fighters.slice(0, n)),
     async startMatch() { ARENA.startMatch(); },
+    async startBossRush() { ARENA.startBossRush(); },
+    async startTournament() { TO.startTournament?.(); },
     async watchFixture() { TO.watchFixture?.(); },
+    // Dispatch ONE Canonical-Schema-v1 Step (header Contract §3 addendum). Mirrors
+    // scripts/record-monolith.mjs's dispatchStep() so both replays produce identical Traces.
+    dispatchStep(step) {
+      if (step.start) {
+        const s = step.start;
+        S.SETTINGS.mode = s.mode;
+        if (s.count != null) S.SETTINGS.count = s.count;
+        if (s.stage != null) S.SETTINGS.stage = s.stage;
+        if (s.chosen != null) S.SETTINGS.chosen = s.chosen;
+        if (s.teams != null) S.SETTINGS.teams = s.teams;
+        if (s.mode === 'bossrush') ARENA.startBossRush();
+        else if (s.mode === 'worldcup') TO.startTournament();
+        else ARENA.startMatch();                                  // ffa | teams
+      } else if (step.tournament) {
+        S.SETTINGS.mode = 'worldcup';
+        S.setTOURNEY_SETUP_SIZE(step.tournament.size);
+        S.setTOURNEY_SETUP_MODE(step.tournament.mode);
+        if (step.tournament.mode === 'spectate') TO.watchFixture(); else TO.startTournament();
+      } else {
+        if (step.down) for (const c of step.down) S.down[c] = true;
+        if (step.up) for (const c of step.up) S.down[c] = false;
+      }
+    },
     audioCtx: () => SND.ctx,
     audioCtxState: () => SND.ctx && SND.ctx.state,
     fireGesture: () => window.dispatchEvent(new window.Event('pointerdown', { bubbles: true })),
@@ -2035,23 +2191,27 @@ export function makeApi({ lite = false } = {}) {
   };
 }
 
-// Deterministic scripted match → Trace. Boots a fresh api (lite selects the trimmed ROSTER/STAGES
-// via BUILD.lite), seeds the RNG, applies each scripted input frame, and records a per-frame
-// checksum plus the end-state snapshot. Plan B/C compare Traces via goldenParity; Plan C's Lite
-// parity is runScriptedMatch({ lite:true, seed, script }) vs a Lite golden recorded from the monolith.
+// Deterministic scripted match → canonical Trace v1 (header Contract §3 addendum). Boots a fresh api
+// (lite selects the trimmed STAGES via BUILD.lite; the roster stays FULL), seeds the RNG, then advances frame-by-frame
+// from 0 to the last step's `at`. At each frame it first dispatches any Step whose `at` equals that
+// frame — the mode-aware start/tournament step (at:0) OR down/up KeyCode arrays folded into the
+// PERSISTENT `down` map (held until released, not a one-frame Object.assign) — then runs exactly one
+// frame and records the per-frame checksum. Returns { frames:string[], final:<snapshot> }; the Trace
+// never contains the ∞ glyph (infinite stocks are the string "INF"). Plan B/C compare Traces via
+// goldenParity; Plan C's Lite parity is runScriptedMatch({ lite:true, seed, script }) vs a Lite golden.
 export function runScriptedMatch({ lite = false, seed, script = [] }) {
   const restore = seedRandom(seed);
   const api = makeApi({ lite });
-  api.state.SETTINGS.mode = 'ffa';
-  api.startMatch();
-  const trace = [];
-  for (const input of script) {
-    api.applyInput(input);
+  const steps = [...script].sort((a, b) => a.at - b.at);
+  const lastAt = steps.reduce((m, s) => Math.max(m, s.at), 0);
+  const frames = [];
+  for (let at = 0; at <= lastAt; at++) {
+    for (const s of steps) if (s.at === at) api.dispatchStep(s);   // start/tournament (at:0) or down/up
     api.runFramesSync(1);
-    trace.push(api.frameChecksum());
+    frames.push(api.frameChecksum());
   }
   restore();
-  return { frames: trace, final: api.snapshot() };
+  return { frames, final: api.snapshot() };
 }
 ```
 `test/harness/index.js` (the canonical barrel — **the single import path Plan B and Plan C use**):
@@ -2077,11 +2237,16 @@ describe('full behavioral suite (real HUD/draw, never stubbed)', () => {
   it('live-state aliasing', async () => { await api.startMatch(); await H.liveStateAliasing(api); restore(); });
   it('per-mode loop start (startMatch)', async () => { await H.perModeLoopStart(api, 'startMatch'); restore(); });
   it('dispatch completeness', () => { H.dispatchCompleteness(api); restore(); });
-  it('runScriptedMatch is deterministic for a fixed seed+script', () => {
-    const script = [{ ArrowRight: true }, { ArrowRight: false, Space: true }, { Space: false }];
+  it('runScriptedMatch is deterministic for a fixed seed+script (canonical Step schema)', () => {
+    const script = [
+      { at: 0, start: { mode: 'ffa', count: 5 } },
+      { at: 5, down: ['ArrowRight'] },
+      { at: 20, up: ['ArrowRight'], down: ['KeyX'] },
+      { at: 30, up: ['KeyX'] },
+    ];
     const a = runScriptedMatch({ seed: 0xC0FFEE, script });
     const b = runScriptedMatch({ seed: 0xC0FFEE, script });
-    expect(a).toEqual(b);
+    expect(a).toEqual(b);            // identical frames[] + final{}
   });
 });
 ```
@@ -2089,33 +2254,25 @@ describe('full behavioral suite (real HUD/draw, never stubbed)', () => {
 // test/golden-parity.test.js
 import { describe, it } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { seedRandom, makeApi, goldenParity } from './harness/index.js';
+import { runScriptedMatch, goldenParity } from './harness/index.js';
+import { SCENARIOS } from './scenarios.js';
 
 const golden = JSON.parse(readFileSync('test/golden/monolith-golden.json', 'utf8'));
 
-function snapshot(S) {
-  return {
-    hudStockPercent: [...S.fighters].map((f) => ({ n: f.name, stk: f.stocks === Infinity ? 'INF' : f.stocks, pct: Math.round(f.pct) })),
-    standingsOrder: [...S.fighters].slice().sort((a, b) => (b.stocks === Infinity ? 0 : b.stocks) - (a.stocks === Infinity ? 0 : a.stocks)).map((f) => f.name),
-    koCount: S.fighters.reduce((s, f) => s + (f.killCount || 0), 0),
-    finalPlacement: [...S.fighters].map((f) => ({ n: f.name, p: f.placement ?? null })),
-  };
-}
-
-describe('golden parity vs monolith', () => {
-  it('FFA fixed-seed match reproduces monolith HUD/standings/KO/placement', async () => {
-    const restore = seedRandom(0xC0FFEE);
-    const api = makeApi();
-    api.state.SETTINGS.mode = 'ffa'; api.state.SETTINGS.count = 5; api.state.SETTINGS.stocks = 3;
-    await api.startMatch();
-    await api.runFrames(400);
-    goldenParity(snapshot(api.state), golden.ffa);
-    restore();
-  });
+// Drive the SHARED scenarios (test/scenarios.js) through the module-side runScriptedMatch and diff
+// each canonical Trace v1 (frames[] + final{}) against the monolith golden recorded from the same
+// file. One `it` per scenario covers FFA / Teams / BossRush / World-Cup(∞) / KO.
+describe('golden parity vs monolith (canonical Trace v1)', () => {
+  for (const sc of SCENARIOS) {
+    it(`${sc.name} reproduces the monolith Trace (frames + HUD/standings/KO/placement)`, () => {
+      const trace = runScriptedMatch({ seed: sc.seed, script: sc.script });
+      goldenParity(trace, golden[sc.name]);   // compares frames[] AND final{}; infinite stocks are 'INF'
+    });
+  }
 });
 ```
 - [ ] **Step 2: Run it, verify it fails** — `npm test -- full-suite golden-parity`. Expected: parity diffs (until every setter/pool rewrite is exact) and/or Infinity/aliasing failures pinpoint the remaining divergence — fix the flagged module, not the test.
-- [ ] **Step 3: Minimal implementation** — resolve every diff the golden/Infinity/aliasing checks surface (a mismatch means a reassignment site still snapshots or a guard landed wrong). Add the Teams / boss-phase / World-Cup(∞) / KO scenarios to `golden-parity.test.js` mirroring the `record-monolith.mjs` scenarios, and record their baselines into `monolith-golden.json` (extend `record-monolith.mjs` with those cases, re-run it). For **Electron parity**, add `test/electron-parity.cjs` that launches the packaged build and runs the same assertions in-renderer:
+- [ ] **Step 3: Minimal implementation** — resolve every diff the golden/Infinity/aliasing checks surface (a mismatch means a reassignment site still snapshots or a guard landed wrong). The Teams / BossRush / World-Cup(∞) / KO scenarios are already the shared `test/scenarios.js` `SCENARIOS`, so `golden-parity.test.js` loops them automatically — to add a case, add one scenario to `test/scenarios.js` and re-run `node scripts/record-monolith.mjs` (and `--lite`) to refresh the golden Traces; do NOT hand-edit `monolith-golden.json`. For **Electron parity**, add `test/electron-parity.cjs` that launches the packaged build and runs the same assertions in-renderer:
 ```js
 // test/electron-parity.cjs — run via: electron test/electron-parity.cjs (after npm run build)
 const { app, BrowserWindow } = require('electron');
@@ -2147,5 +2304,5 @@ app.whenReady().then(async () => {
 
 - **Spec coverage (design §1–§14, scoped to Plan A):** Scaffold + Electron real-origin/CSP/contextIsolation (Task 1, §7/§9); verification harness FIRST with all load-bearing checks — zero-error boot + media-constructor spy, 44-not-32 handler coverage, THE Infinity render test with the REAL `updateHUD`, loop error-containment, live-state aliasing, per-mode loop-start, audio unlock, dispatch completeness post-minify, DOM contract, golden parity, Electron parity (Tasks 2, 30–32, §12); ESLint enforcement (Task 3, §6); DOM/CSS/@fontsource (Task 4, §7); constants/data leaves (Tasks 5–6); `core/state.js` with all 51 singletons + setters + `rt` fields + in-place pools + `shake` + `initDom` (Task 7, §6); engine leaves→core→fighter with `loop`/`step` relocated and `applyHit`/`step`/`setupWorld`/`doSpecial`/`loop` reunited AST-whole (Tasks 9–15, §5/§10); ai + draw with `shake` removed (Tasks 16–17); ui incl Infinity guards co-located and `BStore` localStorage guarantee (Tasks 18–22); modes incl `setupWorld` AST-whole + recorder + Infinity-safe tournament (Tasks 23–27); `window.NET` at import + `applySnapshot` via setters (Task 28); editor (Task 29); the auto-generated handler bridge + boot auto-assert (Task 30, §7); boot wiring with capture-phase unlock listeners and first-`loop()`-by-starter (Task 31); golden + packaged parity (Task 32). Music-engine rebuild and web-Lite target are explicitly excluded (Plans B/C) and `startMusic`/`stopMusic`/`SFX` are preserved verbatim.
 - **Placeholders:** none. Every code step shows real code; every command shows expected output. Extraction tasks cite exact monolith line-ranges from the map JSON, name AST-whole reunions, list the reassignment sites → setters/`rt`/`replaceArr`, and end by running the harness. New code (Vite/Electron config, harness, ESLint, global-actions bridge + boot assert, main boot, boot-api adapter, parity harness) is shown complete.
-- **Canonical Interface Contract v1 conformance (interfaces Plan A produces for B and C):** Execution order A→B→C is stated at the header. **(1) Build flag** — Task 1 creates `src/core/build.js` (`export const BUILD = { lite: __LITE__ }`) and sets the base `vite.config.js` `define: { __LITE__: JSON.stringify(false) }`; Plan C overrides the define to `true` and does not recreate `build.js`. **(2) Test infra + harness barrel** — one test root `test/` (singular) and one Vitest config (the `test` key in `vite.config.js`); Task 32 ships `test/harness/index.js` re-exporting `makeApi({ lite })`, `mulberry32`, `seedRandom`, `runScriptedMatch({ lite, seed, script })`, `goldenParity`, `infinityRenderTest`; `makeApi` accepts `{ lite }` and boots the trimmed ROSTER/STAGES via `BUILD.lite`; goldens are recorded by `scripts/record-monolith.mjs` into `test/golden/`. **(3) Handler coverage** — Task 2 creates the shared leaf `src/core/handler-coverage.js` (`collectHandlerIdentifiers`, `assertHandlerCoverage(win, root)` throwing `HandlerCoverageError`); `ui/global-actions.js` re-exports it and `src/main.js` calls it (the bespoke `assertBootHandlerCoverage` is gone), and Plan C's `main.lite.js` imports the same function. Audio stays the monolith's `audio/audio.js` verbatim; the facade/registry is Plan B's job.
+- **Canonical Interface Contract v1 conformance (interfaces Plan A produces for B and C):** Execution order A→B→C is stated at the header. **(1) Build flag** — Task 1 creates `src/core/build.js` (`export const BUILD = { lite: __LITE__ }`) and sets the base `vite.config.js` `define: { __LITE__: JSON.stringify(false) }`; Plan C overrides the define to `true` and does not recreate `build.js`. **(2) Test infra + harness barrel** — one test root `test/` (singular) and one Vitest config (the `test` key in `vite.config.js`); Task 32 ships `test/harness/index.js` re-exporting `makeApi({ lite })`, `mulberry32`, `seedRandom`, `runScriptedMatch({ lite, seed, script })`, `goldenParity`, `infinityRenderTest`; `makeApi` accepts `{ lite }` and boots the trimmed ROSTER/STAGES via `BUILD.lite`; goldens are recorded by `scripts/record-monolith.mjs` into `test/golden/`. **(§3 addendum) Canonical Scripted-Match Schema v1** — PINNED in the header (Plan A owns it; Plan C conforms): a scenario is `{ name, seed, script: Step[] }` in the shared `test/scenarios.js`; a Step is an `at` frame plus one of `start`(mode-aware: `ffa`/`teams`→`startMatch`, `bossrush`→`startBossRush`, `worldcup`→`startTournament`/`watchFixture`) / `tournament` / `down`/`up` (DOM `event.code` arrays folded into the persistent `down` map). `runScriptedMatch` (Task 32) and `scripts/record-monolith.mjs` (Task 2, incl `--lite`) replay this identical file and both emit the exact Trace `{ frames:string[], final:{ hudStockPercent:{name,stk,pct}[], standingsOrder:string[], koCount, finalPlacement:string[] } }`; infinite stocks encode as the string `'INF'` (never the ∞ glyph — the glyph evidence is `infinityRenderTest`/`hudStockText()`), and `goldenParity` diffs `frames` + `final`. **(3) Handler coverage** — Task 2 creates the shared leaf `src/core/handler-coverage.js` (`collectHandlerIdentifiers`, `assertHandlerCoverage(win, root)` throwing `HandlerCoverageError`); `ui/global-actions.js` re-exports it and `src/main.js` calls it (the bespoke `assertBootHandlerCoverage` is gone), and Plan C's `main.lite.js` imports the same function. Audio stays the monolith's `audio/audio.js` verbatim; the facade/registry is Plan B's job.
 - **Type/name consistency vs the map's exact export names:** Every task's Produces list uses the map's exact export identifiers (e.g. `applyHit, hitCircle, damageSummons`; `updateBossAttack…budgetCutPlatform`; `doSpecial, DASH_KITS, UPSPECIALS, DOWNSPECIALS, ATKSPECIALS`; `buildFighters, makeFighter, shuffle, step, loop`; `buildHUD, updateHUD, updateStandings, banner, showResult`; `NET, serializeState, applySnapshot, autoJoinFromLink, openLobby`; `BStore, recordMatch, openStats, exportStats, resetStats`; `startMatch…testDpsText`). The 51 `coreStateExports` are all homed in `core/state.js` with the three documented write mechanisms; `shake`/`shakeAmt` relocated to state; `BOSS_ATK_ID` module-local in `boss.js`; `RANGE_PROFILE` exported from `attacks.js` and imported by `roster-screen.js`; `updateSummons` in `boss.js`; `pollPad` in `controls-remap.js` consumed by `fighter.step`. All 11 cycles are respected as call-time-only (no CALL-at-eval), and `modules-eval` enforces zero DOM/audio/net side effects after every stage.
