@@ -19,11 +19,11 @@ Two problems to solve:
 
 | Decision | Choice |
 |---|---|
-| Build tool | **Vite** (multi-file ES-module source → bundled) |
-| Deliverable | **Installable Electron desktop app** (not a browser/Chromebook target) |
-| Music source | **Royalty-free Pixabay tracks** — Undertale-style for menu/battle/tournament, atmospheric for boss — under the Pixabay Content License. Original "inspired-by" tracks only, **not** covers of specific copyrighted songs. |
-| Music fallback | Synthesized bed always available, so audio works with zero asset files present |
-| Scope | **Re-architecture only.** No gameplay changes (local 2P, tutorial, mobile, balance are out). |
+| Build tool | **Vite** (multi-file ES-module source → two bundled targets) |
+| Deliverables | **(1) Desktop app** — installable **Electron** build, full game, Hollow-Knight-style installer. **(2) Web "Lite"** — a trimmed browser taster over the *same* `src/` core, that upsells to the desktop app. See §4a. |
+| Music source | **Royalty-free Pixabay tracks** — Undertale-style for menu/battle/tournament, atmospheric for boss — under the Pixabay Content License. Original "inspired-by" tracks only, **not** covers of specific copyrighted songs. (Desktop only — Lite has no music.) |
+| Music fallback | Synthesized bed always available, so desktop audio works with zero asset files present |
+| Scope | **Re-architecture only.** No gameplay changes (local 2P, mobile, balance are out). |
 
 **Copyright boundary (non-negotiable):** We do **not** embed the actual Toby Fox (Undertale/Deltarune) or Christopher Larkin (Hollow Knight/Silksong) recordings, and we do **not** pull from third-party re-uploads of those OSTs (e.g. the SoundCloud "Hollow Knight OST" set). Only Pixabay-licensed originals or assets the owner personally licenses.
 
@@ -38,17 +38,19 @@ smash-island/
 ├─ artifacts/                    # UNTOUCHED reference: v1 HTML + design/review docs
 ├─ docs/superpowers/specs/       # this design + the decomposition-map JSON
 ├─ package.json                  # vite, electron, electron-builder, @fontsource
-├─ vite.config.js
-├─ index.html                    # Vite entry: DOM shell only (verbatim from monolith body)
+├─ vite.config.js                # multi-page input: full + lite targets (§4a)
+├─ index.html                    # FULL entry: DOM shell (verbatim from monolith body)
+├─ index.lite.html               # LITE entry: trimmed shell (no editor/lobby/co-op/test screens)
 ├─ electron/
 │  ├─ main.cjs                   # BrowserWindow; loads dev server / built dist; CSP
 │  └─ preload.cjs                # contextIsolation:true, nodeIntegration:false
-├─ public/assets/music/          # royalty-free tracks + README manifest
+├─ public/assets/music/          # royalty-free tracks + README manifest (desktop only)
 ├─ styles/
 │  ├─ tokens.css                 # :root custom props (--grass/--host/--gold/…) — loads FIRST
 │  └─ app.css                    # everything else
 └─ src/
-   ├─ main.js                    # boot/wiring only
+   ├─ main.js                    # FULL boot/wiring
+   ├─ main.lite.js               # LITE boot/wiring (imports only the Lite module set, §4a)
    ├─ core/
    │  ├─ state.js                # ALL mutable shared singletons + setters + shake()
    │  └─ constants.js            # immutable tunables + control defaults (leaf)
@@ -62,6 +64,31 @@ smash-island/
    ├─ net/ netcode.js
    └─ editor/ level-editor.js
 ```
+
+## 4a. Build targets: Desktop (full) vs Web Lite
+
+Two Vite outputs over one shared `src/` core. The clean module boundaries are what make the Lite build nearly free — Lite is defined by *which modules its entry imports*, not by forking code.
+
+| | **Desktop (full)** | **Web Lite** |
+|---|---|---|
+| Package | Electron installer (`npm run dist`) | Static site (`dist-lite/`, deployable to any host) |
+| Entry | `index.html` + `src/main.js` | `index.lite.html` + `src/main.lite.js` |
+| Modes | Arena (FFA+Teams), Tutorial, Boss Rush, World Cup, **LAN**, **level editor**, **co-op AI planning**, **Test/Sandbox** | Arena (FFA+Teams), Tutorial, Boss Rush, World Cup |
+| Content | Full roster + all stages | **Trimmed taster** roster + stage subset |
+| Music | Full adaptive engine + Pixabay tracks | **None** (SFX retained) |
+| Stats viewer | Yes | No (dev-facing) |
+
+**What Lite omits (its entry never imports these):** `net/netcode.js`, `editor/level-editor.js`, `modes/coop-planning.js`, `audio/music-director.js`, `audio/stem-player.js`, `audio/manifest.js`, the Test/Sandbox and stats-viewer paths, and the `public/assets/music/` payload. **Lite keeps** the whole engine, AI, renderer, HUD, router, `modes/arena|tutorial|boss-rush|tournament`, and `audio/bus.js`+`audio/sfx.js` (SFX only).
+
+**Mechanism:**
+- **Trimmed content** stays single-source-of-truth: roster/stage entries carry a `lite: true` flag; the Lite build filters `ROSTER`/`STAGES` to that subset at load (a `BUILD.lite` constant injected via Vite `define`). No duplicated data tables.
+- **`startMusic`/`stopMusic` stay callable** in both builds — the `audio/audio.js` facade no-ops music when `BUILD.lite` (or when the director module isn't present), so `modes/arena|tutorial|boss-rush` need no per-build branching. SFX calls are unchanged.
+- **Trimmed DOM shell:** `index.lite.html` drops the editor/lobby/co-op/test `.screen` blocks and their inline `on*=` handlers, so the boot-time handler-coverage assertion (§7) validates *per build* — a Lite handler referencing an omitted module fails loudly at Lite boot, not silently in prod.
+- **Tree-shaking guarantee:** because omitted features are only reachable through their (unimported) modules, Rollup drops them from the Lite bundle entirely — no dead LAN/editor/music code ships to the web.
+
+Every verification check in §12 runs against **both** targets; the golden-parity diff (§12) additionally asserts the Lite build reproduces monolith behavior for the modes it *does* include.
+
+> **Open reading to confirm at review:** "no music" is interpreted as *no music director/tracks, SFX retained*. If zero audio is wanted in Lite, the Lite entry also skips `audio/bus.js`+`audio/sfx.js` and `startSound` no-ops — a one-line change.
 
 ## 5. Module architecture
 
@@ -102,7 +129,9 @@ Every module's exact exports/imports are enumerated in the map JSON. Key structu
 
 **Recommended follow-up (not this pass):** migrate the 44 inline handlers to `addEventListener` delegation keyed on `data-action` attributes, which is CSP-clean (no inline allowance, no window bridge) and the better long-term posture for a packaged app. Deferred to keep this pass behavior-identical and low-churn. Flagged for the review gate. A related security follow-up: audit any `innerHTML` rendering of co-op-chat / LLM responses.
 
-## 8. Music engine (`src/audio/`)
+## 8. Music engine (`src/audio/`) — desktop only
+
+The music engine ships in the **desktop build only**; the Web Lite build omits `music-director.js`/`stem-player.js`/`manifest.js` and the track assets, and the `audio/audio.js` facade no-ops `startMusic`/`stopMusic` under `BUILD.lite` (SFX unchanged). Everything below therefore describes the desktop target.
 
 Replaces the `setTimeout` loop while **preserving the existing call sites** — `startMusic('battle'|'boss'|'menu'|'tourney')` and `stopMusic()` keep working exactly where arena/tutorial/boss-rush/hud call them, so no game code changes. New internals + one optional new hook (`setIntensity`).
 
@@ -119,12 +148,18 @@ Replaces the `setTimeout` loop while **preserving the existing call sites** — 
 
 **Audio-unlock race:** `sndInit()`+`sndResume()` are idempotent and called at the top of every mode starter (and from a window-level unlock listener registered in capture phase, not `{once:true}` on a narrow element), so the first gesture always unlocks the context before any `startMusic` on that same gesture. `startMusic` no-ops (doesn't queue) while the context isn't `running`.
 
-## 9. Electron shell
+## 9. Build & shell (both targets)
 
+**Desktop — Electron:**
 - `electron/main.cjs` creates the `BrowserWindow`, loads `http://localhost:<vite>` in dev and the built `dist/` in prod **via a real origin** (custom `app://` protocol or a localhost server) so `localStorage` works — never bare `file://` (which can throw `SecurityError` and breaks `BStore`).
 - `electron/preload.cjs`: `contextIsolation: true`, `nodeIntegration: false`. The game needs no Node — it's canvas + WebAudio + WebSocket. (The in-page `window.NET`/`window.TESTMODE` bridge is page-scoped and unaffected by context isolation.)
-- Scripts: `npm run dev` (Vite + Electron, hot reload) · `npm run build` (Vite) · `npm run dist` (electron-builder → Windows installer).
 - **Parity requirement:** the full behavioral suite runs inside the **packaged** build, not just dev — CSP, fonts, `localStorage`, and audio-unlock all diverge between dev and packaged.
+
+**Web — Lite:**
+- Plain static build (`vite build` with the `index.lite.html` input) → `dist-lite/`, deployable to any static host. No Electron, no LAN server, no music assets — small and CDN-friendly. `localStorage` works on a real web origin.
+- Same trimmed-shell + per-build handler assertion as everywhere else (§4a, §7).
+
+**Scripts:** `npm run dev` (Vite + Electron full, hot reload) · `npm run dev:lite` (Vite, Lite in a browser) · `npm run build` (both targets) · `npm run dist` (electron-builder → desktop installer) · `npm run build:lite` (→ `dist-lite/`).
 
 ## 10. Extraction method
 
@@ -160,8 +195,9 @@ Run after **every** extraction stage. Full list of 14 checks in the map JSON; th
 - **Per-mode loop-start:** each starter (`startMatch`, `beginMatchNow`, `startTutorial`, `startBossRush`, `watchFixture`, net `applySnapshot`) produces moving frames.
 - **Audio unlock:** `SND.ctx===null` at load; first click → `suspended`→`running` + music (not silence).
 - **Dispatch completeness post-minify:** every `ROSTER` kit's `special/up/down/attack` and every `SMASHES` key resolves to a function.
-- **Electron parity suite:** the entire suite inside the packaged build.
-- **Golden parity vs monolith:** drive both builds through a fixed-seed recorded-input match (FFA, Teams, a boss phase transition, a World Cup group match, a KO/eliminate) and diff HUD stock/percent text, standings order, KO count, final placement. Equality proves behavior is *preserved*, not merely that the build runs.
+- **Electron parity suite:** the entire suite inside the packaged desktop build.
+- **Golden parity vs monolith:** drive the desktop build (and the Lite build, for the modes it includes) through a fixed-seed recorded-input match (FFA, Teams, a boss phase transition, a World Cup group match, a KO/eliminate) and diff HUD stock/percent text, standings order, KO count, final placement. Equality proves behavior is *preserved*, not merely that the build runs.
+- **Lite build checks:** the Lite bundle contains **no** LAN/editor/co-op/music code (assert omitted symbols are tree-shaken out); its trimmed roster/stage subset loads; its per-build handler assertion passes; and it runs in a plain browser with no console errors.
 
 ## 13. Out of scope
 
@@ -169,7 +205,8 @@ Gameplay changes from the adversarial review (local 2-player, 60-second tutorial
 
 ## 14. Definition of done
 
-- `npm run dev` launches the Electron app; every screen, mode, boss, tournament, editor, and LAN path behaves identically to `artifacts/V1/index.html`.
-- The full verification suite passes, including the golden-parity diff and the Electron packaged parity suite.
-- Music is sample-accurate, layered by intensity, survives tab-background, and falls back to synth when assets are absent.
-- `npm run dist` produces a Windows installer.
+- `npm run dev` launches the **desktop** Electron app; every screen, mode, boss, tournament, editor, and LAN path behaves identically to `artifacts/V1/index.html`.
+- `npm run dev:lite` runs the **Web Lite** build in a browser: Arena, Tutorial, Boss Rush, and World Cup on the trimmed roster/stage set, SFX but no music, and no LAN/editor/co-op code in the bundle.
+- The full verification suite passes on both targets, including the golden-parity diff and the Electron packaged parity suite.
+- Desktop music is sample-accurate, layered by intensity, survives tab-background, and falls back to synth when assets are absent.
+- `npm run dist` produces a desktop installer; `npm run build:lite` produces a deployable `dist-lite/`.
