@@ -10,6 +10,13 @@ describe('scaffold', () => {
     for (const s of ['dev', 'build', 'dist', 'test', 'lint'])
       expect(pkg.scripts).toHaveProperty(s);
   });
+  it('declares terser, since vite.config.js sets build.minify to terser', () => {
+    // vite.config.js configures `build.minify: 'terser'` with a terserOptions block.
+    // terser is an optional peer of vite and is NOT pulled in transitively, so omitting it
+    // here silently breaks `npm run build` / `npm run dist` (regression guard for that).
+    const pkg = JSON.parse(readFileSync('package.json', 'utf8'));
+    expect({ ...pkg.dependencies, ...pkg.devDependencies }).toHaveProperty('terser');
+  });
   it('electron main loads a real origin, never bare file://', () => {
     const main = readFileSync('electron/main.cjs', 'utf8');
     expect(main).toMatch(/contextIsolation:\s*true/);

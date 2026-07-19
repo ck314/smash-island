@@ -1,4 +1,4 @@
-const { app, BrowserWindow, session } = require('electron');
+const { app, BrowserWindow, session, protocol, net } = require('electron');
 const path = require('node:path');
 
 const DEV = !app.isPackaged;
@@ -39,7 +39,6 @@ function createWindow() {
 
 // Register a real-origin protocol for the packaged build (prod parity task wires dist/ here).
 if (!DEV) {
-  const { protocol } = require('electron');
   protocol.registerSchemesAsPrivileged([
     { scheme: 'app', privileges: { standard: true, secure: true, supportFetchAPI: true } },
   ]);
@@ -48,7 +47,6 @@ if (!DEV) {
 app.whenReady().then(() => {
   setCsp();
   if (!DEV) {
-    const { protocol, net } = require('electron');
     protocol.handle('app', (req) => {
       const url = new URL(req.url);
       const file = path.join(__dirname, '..', 'dist', url.hostname + url.pathname);
