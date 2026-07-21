@@ -6,3 +6,4 @@ release/
 *.log
 artifacts/_*.txt
 .DS_Store
+.vercel

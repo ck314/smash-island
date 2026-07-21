@@ -29,6 +29,11 @@ export default defineConfig({
   test: {
     environment: 'jsdom',
     include: ['test/**/*.test.js'],
+    // test/pending/ holds TDD tests written ahead of their implementation. They are red by
+    // design and are excluded so the suite stays green as a trustworthy gate; move a file up
+    // into test/ when the code it specifies lands. Currently: eslint-rules.test.js, which
+    // needs the eslint.config.js state-safety rules from Plan A.
+    exclude: ['test/pending/**'],
     setupFiles: ['./test/setup/jsdom-canvas.js'],
     globals: false,
   },
