@@ -161,7 +161,7 @@ Starters  ──▸  Unlocked  ──▸  Everything
 
 ### Phase 1 — Unblock and launch
 
-- [ ] **Unit 1: Unify branches**
+- [x] **Unit 1: Unify branches**
 
 **Goal:** `main` holds the monolith, `vercel.json`, and the harness, so work and verification share one tree.
 
@@ -184,7 +184,7 @@ Starters  ──▸  Unlocked  ──▸  Everything
 
 ---
 
-- [ ] **Unit 2: Strip the credential surface**
+- [x] **Unit 2: Strip the credential surface**
 
 **Goal:** No API-key collection anywhere, zero functional loss. The deploy blocker. **(R1)**
 
@@ -212,7 +212,7 @@ Starters  ──▸  Unlocked  ──▸  Everything
 
 ---
 
-- [ ] **Unit 3: Fix pre-existing progression blockers**
+- [x] **Unit 3: Fix pre-existing progression blockers**
 
 **Goal:** Repair bugs that would silently make Unit 9's hooks wrong. **(R4, R5)**
 
@@ -236,7 +236,7 @@ Starters  ──▸  Unlocked  ──▸  Everything
 
 ---
 
-- [ ] **Unit 4: Zero-diff golden re-record**
+- [x] **Unit 4: Zero-diff golden re-record**
 
 **Goal:** Prove Units 2–3 changed no behavior. A grep gate cannot show this.
 
