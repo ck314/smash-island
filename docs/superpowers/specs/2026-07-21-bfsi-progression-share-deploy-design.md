@@ -52,7 +52,7 @@ No secret is hardcoded anywhere; the exposure is reputational and trust-related,
 | Decision | Choice |
 |---|---|
 | Goal | **Both, re-sequenced** — keep the modular architecture, but land player-facing value and a public URL far earlier than Plan C |
-| Sequencing | **Monolith wins first, then refactor.** Extraction is mechanical line-moving, so features added now are carried through Plan A at no extra cost. Only cost is re-running `scripts/record-monolith.mjs` |
+| Sequencing | **Monolith wins first, then refactor.** See §2.1 — the cost is real but bounded, *not* zero as an earlier draft claimed |
 | Scope | Tier 0 strip → **C** tournament → **A** progression → **B** share → deploy |
 | Unlock model | **Hybrid** — fast drip cadence + ~8–10 hand-authored trophies |
 | Unlock escape hatch | **"Show everything" settings toggle** |
@@ -64,13 +64,41 @@ No secret is hardcoded anywhere; the exposure is reputational and trust-related,
 
 **Out of scope:** touch/mobile controls, balance passes, any Plan A–D work, in-game accounts, chat, matchmaking.
 
+### 2.1 The real cost of sequencing before the refactor
+
+An earlier draft claimed extraction is "mechanical line-moving" so this work is carried through Plan A "at no extra cost, only re-running `scripts/record-monolith.mjs`." **That is false and must not be used to justify the sequence.** Verified against `docs/superpowers/plans/2026-07-17-bfsi-modularization.md`:
+
+- **Plan A tasks are keyed to monolith line ranges**, not symbols (e.g. Task 27: *"Monolith ranges `1274-1294, 1863-2004`"*). Every insertion or deletion shifts them.
+- **Task 27 is materially invalidated.** It extracts `coop-planning.js` with instructions to keep `PLAN_KEY` module-local and *"`planLLM` hits `api.anthropic.com` — keep behavior but it must be inside `planSend`"*, and its commit message encodes that. Workstream 0 deletes `PLAN_KEY`, `planLLM`, `syncTeamKey`, `saveHomeKey`, `clearHomeKey`, and `planSetKey`.
+- **The Electron CSP** (plan line 193) whitelists `https://api.anthropic.com` in `connect-src` — no longer needed.
+- **Task 4 already deletes the Google Fonts `@import`** (plan line 824). Workstream 0 duplicates it.
+- The decomposition map describes a **5,861-line** monolith; the file is **6,513** lines today, so this drift has already occurred once independently.
+
+**Honest accounting:** most of this is *simplification* — Task 27 shrinks, the CSP entry disappears, Task 4's font work is pre-done. The genuine new cost is a re-derivation pass over Plan A's line ranges plus map entries for new symbols (`fighterRating`, the profile record, `isUnlocked`, any vendored encoder). That is real work, and the sequencing decision should be made against it rather than against a claim of zero.
+
 ---
 
 ## 3. Workstream 0 — Strip the credential surface (deploy blocker)
 
 **Goal:** no API-key surface anywhere, with zero functional loss.
 
-**Delete:** the `.apikeybox` styles (`:229-233`) and markup (`:310-316`); the `teamApiKey` input (`:504`); `PLAN_KEY` and all reads (`:1264-1267`, `:1863-1880`, `:1931`, `:1959-1960`, `:1978`); `syncTeamKey()`, `setHomeKey()`, `clearHomeKey()`; `planLLM()` (`:1997-2004`); the `prompt()` key request (`:1959`); and the misleading string at `:1871`.
+**Delete — the complete surface.** An earlier draft of this list was incomplete in a way that would have shipped the defect: several credential-request surfaces contain none of the grep-gate tokens, so the gate went green while a `🔑 API key` button was still on screen.
+
+| Line(s) | What |
+|---|---|
+| `:229-233` | `.apikeybox` styles |
+| `:310-318` | Title-screen `.apikeybox` markup (**full block** — `:310-316` truncates it) |
+| `:317` | `#homeKeyNote` ("Your key stays in memory only…") |
+| `:499-501` | `#teamKeyPrompt` — **"⚠ Team chat needs a Claude API key to start"** |
+| `:503` | `Claude API key` planrow label |
+| `:504` | `teamApiKey` input |
+| `:536` | `planKeyBtn` — **`<button …>🔑 API key</button>`** |
+| `:543` | `planKeyNote` ("Add a Claude API key for real conversation.") |
+| `:1264-1267`, `:1863-1884`, `:1931`, `:1959-1960`, `:1978` | `PLAN_KEY` and all reads |
+| — | `syncTeamKey()`, **`saveHomeKey()`** (not `setHomeKey()` — that name does not exist), `clearHomeKey()`, `planSetKey()`, `planLLM()` (`:1997-2004`) |
+| `:1871` | The misleading "A key is required…" string |
+
+Deleting `planSetKey()` without deleting `planKeyBtn` (`:536`) leaves a live button whose handler throws — verify no `on*=` attribute references a removed global.
 
 **Preserve:** `planScriptedReply()` (`:1988`) and `captureTeamPlan()`. The branch at `:1978` collapses to its existing `else`, so scripted teammate replies become unconditional.
 
@@ -86,7 +114,25 @@ No secret is hardcoded anywhere; the exposure is reputational and trust-related,
 
 `teamStrength()` (`:1473`) is called only from `simGroupMatch()` (`:1460`) and `simKnockoutMatch()` (`:1516`) — both **unwatched simulations**. Playable matches already use real physics, so this workstream cannot affect hands-on gameplay.
 
-**Design:** a new `fighterRating(r)` derives a scalar from `RANGE_PROFILE[r.kit.special]` (`:3605` — a curated, balance-tuned table of `reach`/`dmg`/`kb`, with comments citing measured 1v1 results) plus weight `r.w`. Fighters with no profile entry fall through the existing default (`:3675`) and rate `1.0`. `teamStrength(t)` becomes the sum of member ratings, containing **no `Math.random()`**.
+> **🔴 BLOCKING — the original design was inverted. Do not implement until resolved.**
+>
+> An earlier draft derived the rating from `RANGE_PROFILE[r.kit.special]` (`:3605`), calling it "a curated, balance-tuned table." It *is* balance-tuned — and that is exactly the problem. It is a **compensation** table: its values were adjusted to *flatten* win rates, so high stats mark historically **weak** fighters. Verified in the table's own comments:
+>
+> | Entry | Stat | Comment |
+> |---|---|---|
+> | `debuff` (Golf Ball) | `dmg:5` — lowest band | `92% real 1v1 -> trimmed again` |
+> | `zap` (Lightning) | `dmg:5` | `trimmed: too strong` |
+> | `bomb` (Bomby) | `dmg:7` | `90% real 1v1 -> trimmed` |
+> | `fluff` (Pillow) | `dmg:8` — high band | `15% real 1v1 — buffed` |
+> | `barf` (Barf Bag) | `dmg:8` | `buffed: was bottom` |
+>
+> A rating built from `reach`/`dmg`/`kb` would rank the roster **roughly backwards**, making the World Cup systematically favor the weakest fighters — the precise inverse of this workstream's goal, and the §8 criterion-3 gate (which only checks upset *spread*) would not catch it.
+>
+> **Rating source is therefore an open decision** (see handoff). The obvious candidate the original draft never considered: `balance:tallies` in `BStore` already persists real per-fighter `{games, wins, kos, falls, dmgDealt}` from actual play (`:4756`) — the measured signal, not the compensation for it. Whatever source is chosen, acceptance must validate the **sign** of the correlation against measured win rates, not just the spread.
+
+**Design (pending the rating-source decision):** a new `fighterRating(r)` returns a deterministic scalar; fighters with no data fall through to `1.0`. `teamStrength(t)` sums member ratings and contains **no `Math.random()`**.
+
+**Retain the `let s=1` baseline.** Today's `teamStrength` starts at `1` and adds `0.5–1.0` per member. That baseline is the dominant equalizing term — at team size 1 it compresses win probability to roughly 0.43–0.57. Dropping it silently multiplies effective spread and makes the target band in the next paragraph unreachable.
 
 **Why determinism is safe:** both callers already supply variance through five strength-weighted rolls. Removing RNG from the *rating* while leaving it in the *rolls* is what makes a stronger team win more often while keeping upsets routine.
 
@@ -100,7 +146,22 @@ No secret is hardcoded anywhere; the exposure is reputational and trust-related,
 
 **Goal:** a reason to come back tomorrow and something to brag about, built from content that already exists.
 
-**Storage.** A `profile:v1` record in the existing `BStore` (`:4708`), written from the existing `recordMatch()` call site (`:4735`) which already computes per-fighter results. Existing key namespaces are `balance:*` and `levels:*`, so `profile:*` does not collide.
+**Storage.** A `profile:v1` record in the existing `BStore` (`:4708`). Existing key namespaces are `balance:*` and `levels:*`, so `profile:*` does not collide.
+
+**⚠️ `recordMatch()` alone is not a sufficient hook.** Its single call site (`:4681`) sits *after* a tournament early-return, so **no World Cup match ever reaches it** — `matches`/`wins` would undercount, and three of the seven profile fields have no source there at all. Additional hooks are required:
+
+| Field | Source |
+|---|---|
+| `matches`, `wins`, `kos` | `recordMatch()` (`:4681`) — **plus** a tournament path that bypasses the early return |
+| `wcTitles` | `TOURNEY.champion = winners[0]` (`:1526`) |
+| `bestRushLoop` | `BOSSRUSH.loop++` (`:1827`) |
+| `bossesCleared` | Boss-defeat path in Boss Rush |
+
+**⚠️ Unlock state must be a new field, never `r.play`.** The `locked` class is emitted by `c.className='cell '+(r.play?'play':'locked')` (`:1052`), so "reuse the locked path" reads as "set `play:false`" — but `r.play` also gates the default fighter (`:851`), the tutorial pick (`:1325`), the **tournament pool** (`:1405`), and the CPU/netplay pools (`:2244`, `:2264`). Setting it false would silently shrink the World Cup roster and corrupt Workstream C's tuning. `r.play` stays `true` for all 59; unlock state is `profile.unlocked` membership, read only by `buildBoard()`.
+
+**⚠️ `BStore` is async; `buildBoard()` is not.** `BStore.get` returns a Promise, while `buildBoard()` is synchronous and re-entrant (called from `c.onclick`). `isUnlocked(r)` cannot consult storage at render time — the profile must be hydrated into an in-memory object during boot, **before the first `buildBoard()`**, with a defined pre-hydration render state. Note also that `BStore.available()` (`:4728`) is the one accessor with no `try/catch`; any new call must be wrapped.
+
+**⚠️ Existing installs must be grandfathered.** A returning player has no `profile:v1` and is otherwise indistinguishable from a new one — they would drop from 59 available fighters to 8, directly violating §8 criterion 6. On first run with no profile, check for pre-existing `balance:matchlog` / `balance:tallies`; if either shows prior play, seed `unlocked` with the full roster.
 
 ```
 profile:v1 = { matches, wins, kos, bossesCleared:{}, bestRushLoop, wcTitles, unlocked:[] }
@@ -170,7 +231,7 @@ The single `Save Clip` action becomes three: **Save GIF · Share · Copy link**.
 - **Statistical check** for C (§4) — not a spot check.
 - **Persistence check** for A: play → reload → state intact; plus a first-run path with no stored profile.
 - **Degradation checks** for B across missing `MediaRecorder`, missing `navigator.share`, and unreliable seek.
-- **Grep gate** for Workstream 0: `sk-ant`, `api.anthropic.com`, `PLAN_KEY`, `fonts.googleapis.com` all absent.
+- **Grep gate** for Workstream 0 — case-insensitive absence of `sk-ant`, `anthropic`, `api[ -]?key`, `apikey`, `planKey`, `planSetKey`, `PLAN_KEY`, `fonts.googleapis.com`. The original four-token gate was insufficient: none of them appear in the `🔑 API key` button, the `#teamKeyPrompt` warning, or the two key-note strings. Plus a boot assertion that no inline `on*=` handler references a missing global.
 
 ---
 
