@@ -4696,6 +4696,93 @@ const BStore = {
     }catch(e){ return false; }
   }
 };
+// ============================================================
+//  PLAYER PROFILE — persistent progression (Workstream A)
+//  Namespaced profile:* so it never collides with balance:* or levels:*.
+// ============================================================
+const PROFILE_KEY = 'profile:v1';
+let PROFILE = null;            // in-memory source of truth; hydrated before the first buildBoard()
+let PROFILE_STORAGE_OK = true; // false once storage proves unusable — we then degrade OPEN
+let profileReady = null;       // boot hydration promise (tests await it)
+
+function freshProfile(){
+  return { version:1, matches:0, wins:0, kos:0, bossesCleared:{}, bestRushLoop:0,
+           wcTitles:0, unlocked:[...STARTERS], viewMode:'starters', migratedFrom:null };
+}
+// Everything unlocked — used when storage is unavailable and when grandfathering an existing
+// install. Degrading OPEN is deliberate: a blocked-storage Chromebook must never leave a player
+// stuck at 8 fighters with no way forward and no error.
+function openProfile(from){
+  const p = freshProfile();
+  p.unlocked = ROSTER.map(r=>r.name);
+  p.migratedFrom = from || 'no-storage';
+  return p;
+}
+// Union unlocks, take the max of counters. NEVER a wholesale overwrite: two tabs are the norm on
+// a school Chromebook, and a blind write makes an earned fighter visibly vanish.
+function mergeProfiles(stored, mine){
+  if(!stored) return mine;
+  const out = {...stored, ...mine};
+  out.unlocked   = [...new Set([...(stored.unlocked||[]), ...(mine.unlocked||[])])];
+  out.matches    = Math.max(stored.matches|0,    mine.matches|0);
+  out.wins       = Math.max(stored.wins|0,       mine.wins|0);
+  out.kos        = Math.max(stored.kos|0,        mine.kos|0);
+  out.bestRushLoop = Math.max(stored.bestRushLoop|0, mine.bestRushLoop|0);
+  out.wcTitles   = Math.max(stored.wcTitles|0,   mine.wcTitles|0);
+  out.bossesCleared = Object.assign({}, stored.bossesCleared||{}, mine.bossesCleared||{});
+  out.migratedFrom = stored.migratedFrom || mine.migratedFrom || null;
+  return out;
+}
+// Parse failure is treated as MISSING, not as an empty object. The usual try/JSON.parse/catch{}
+// idiom yields {}, which would look like "profile present but empty" and skip grandfathering —
+// silently demoting a returning player from 59 fighters to 8.
+function parseProfile(raw){
+  if(!raw) return null;
+  try{ const p = JSON.parse(raw); return (p && typeof p==='object' && !Array.isArray(p)) ? p : null; }
+  catch(e){ return null; }
+}
+async function loadProfile(){
+  let raw = null;
+  try{
+    if(!BStore.available()){ PROFILE_STORAGE_OK=false; PROFILE=openProfile('no-storage'); return PROFILE; }
+    raw = await BStore.get(PROFILE_KEY);
+  }catch(e){ PROFILE_STORAGE_OK=false; PROFILE=openProfile('no-storage'); return PROFILE; }
+
+  const stored = parseProfile(raw);
+  if(stored){ PROFILE = Object.assign(freshProfile(), stored); return PROFILE; }
+
+  // No usable profile. Decide once whether this is a brand-new player or an existing install
+  // predating progression, then record the verdict so the heuristic never runs again.
+  let priorPlay = false;
+  try{
+    const keys = ['bfsi:tutorialDone','levels:custom','balance:matchlog','balance:tallies'];
+    for(const k of keys){ if(await BStore.get(k)){ priorPlay=true; break; } }
+    if(!priorPlay && typeof localStorage!=='undefined' && localStorage.getItem('bfsi:tutorialDone')) priorPlay=true;
+  }catch(e){}
+  PROFILE = priorPlay ? openProfile('pre-A') : freshProfile();
+  await saveProfile();
+  return PROFILE;
+}
+async function saveProfile(){
+  if(!PROFILE || !PROFILE_STORAGE_OK) return false;
+  try{
+    const merged = mergeProfiles(parseProfile(await BStore.get(PROFILE_KEY)), PROFILE);
+    await BStore.set(PROFILE_KEY, JSON.stringify(merged));
+    PROFILE = merged;
+    return true;
+  }catch(e){ PROFILE_STORAGE_OK=false; return false; }
+}
+function isUnlocked(r){
+  if(!PROFILE) return true;                       // pre-hydration: never show a locked board
+  if(PROFILE.viewMode==='everything') return true;
+  return PROFILE.unlocked.indexOf(r.name)>=0;
+}
+function unlockFighter(name){
+  if(!PROFILE || PROFILE.unlocked.indexOf(name)>=0) return false;
+  PROFILE.unlocked.push(name);
+  return true;
+}
+
 async function recordMatch(winTeam){
   try{
     if(!BStore.available()) return;
@@ -6484,6 +6571,13 @@ async function resetStats(){
 }
 
 // ---------- boot ----------
+// Hydrate the profile BEFORE the first board render. BStore.get is async while buildBoard() is
+// synchronous and re-entrant, so isUnlocked() cannot consult storage at render time — it reads
+// the in-memory PROFILE. Rendering first and re-rendering later would briefly show fighters the
+// player has earned as locked, i.e. taking things away on screen.
+profileReady = (async()=>{ try{ await loadProfile(); }catch(e){ PROFILE = openProfile('load-failed'); } })();
+profileReady.then(()=>{ try{ buildBoard(); }catch(e){} });
+
 buildBoard();
 try{ autoJoinFromLink(); }catch(e){}   // opened via a shared ...#room=ABCD invite link
 // Clicking an invite link while already on the site is a SAME-DOCUMENT navigation — the script
