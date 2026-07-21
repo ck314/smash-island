@@ -1031,7 +1031,10 @@ function go(id){
 // ---------- roster board ----------
 // A wall of 59 unfamiliar names is the #2 reason a new player bounces. Show a small set of
 // recognisable starters first; the full roster is one click away and never hidden from anyone.
-const STARTERS = ["Firey","Leafy","Bubble","Pencil","Blocky","Ice Cube","Match","Four"];
+// "Four" used to be listed here, but Four is the FINAL BOSS (BOSS_ROSTER), not a playable
+// fighter — so buildBoard's ROSTER filter silently dropped him and the "8 starters" board has
+// always rendered 7 cells. Swapped for Pen, who is both recognisable and actually selectable.
+const STARTERS = ["Firey","Leafy","Bubble","Pencil","Blocky","Ice Cube","Match","Pen"];
 let SHOW_ALL_CHARS = false;
 function buildBoard(){
   const b=document.getElementById('board'); if(!b) return; b.innerHTML='';
@@ -1342,7 +1345,7 @@ function tutorialTick(){
 }
 function tutorialComplete(){
   TUT.done=true; TUT.active=false; running=false;
-  markTutorialSeen();
+  markTutorialSeen(); try{ awardTutorialUnlock(); }catch(e){}
   banner("Nice! You're ready.", 1800);
   setTimeout(()=>{ go('select'); }, 1200);
 }
@@ -1365,7 +1368,7 @@ function drawTutorialPrompt(){
 }
 function finishTutorial(skip){
   TUT.active=false; TUT.done=true; running=false;
-  markTutorialSeen();
+  markTutorialSeen(); try{ awardTutorialUnlock(); }catch(e){}
   go('select');
 }
 function openTournamentSetup(){
@@ -1522,7 +1525,9 @@ function simKnockoutMatch(fx){
 function advanceKnockout(){
   const cur = TOURNEY.bracket[TOURNEY.knockoutRound];
   const winners = cur.map(fx=> fx.winner);
-  if(winners.length===1){ TOURNEY.champion=winners[0]; TOURNEY.stage="done"; showTourneyHub(); return; }
+  if(winners.length===1){ TOURNEY.champion=winners[0]; TOURNEY.stage="done";
+    try{ awardWorldCup(TOURNEY.champion); }catch(e){}   // award AT assignment, guarded + idempotent
+    showTourneyHub(); return; }
   const next=[];
   for(let i=0;i<winners.length;i+=2){ next.push({ kind:"ko", a:winners[i], b:winners[i+1], played:false, result:null }); }
   TOURNEY.bracket.push(next); TOURNEY.knockoutRound++;
@@ -1812,6 +1817,7 @@ function bossRushCheck(){
   // boss down: clear it, advance to the next (endless gauntlet)
   if(boss && boss.hp<=0){
     BOSSRUSH.cleared++;
+    try{ awardBossCleared(boss.name); }catch(e){}   // persist at the deed, not at run end
     for(let i=0;i<40;i++) puff(boss.x,boss.y,boss.color,8);
     const wasFour = (boss.name==="Four");
     // clear any leftover swallow state so nobody stays trapped when the boss dies
@@ -1824,6 +1830,7 @@ function bossRushCheck(){
     if(wasFour){
       // beat the final boss → loop the gauntlet from the top, doubling boss damage each loop
       BOSSRUSH.loop++; BOSSRUSH.dmgMult *= 2; BOSSRUSH.bossIdx = 0;
+      try{ awardRushLoop(BOSSRUSH.loop+1); }catch(e){}
       banner("GAUNTLET LOOP "+(BOSSRUSH.loop+1)+" — bosses hit x"+BOSSRUSH.dmgMult+"!", 2200);
     } else {
       BOSSRUSH.bossIdx = (BOSSRUSH.bossIdx+1) % BOSS_ROSTER.length;
@@ -4639,6 +4646,7 @@ function checkWin(){
       }
       return;
     }
+    awardMatchProgress(winTeam);   // profile + unlock delta, computed synchronously
     recordMatch(winTeam);    // log the result for balance analysis
     setTimeout(()=>showResult(winners, winTeam),700);
   }
@@ -4781,6 +4789,86 @@ function unlockFighter(name){
   if(!PROFILE || PROFILE.unlocked.indexOf(name)>=0) return false;
   PROFILE.unlocked.push(name);
   return true;
+}
+
+// ---------- unlock model: fast drip + hand-authored trophies ----------
+// Reveal order for the 51 non-starters. Fixed, so two players at the same match count have the
+// same roster and can compare progress.
+const UNLOCK_ORDER = ROSTER.map(r=>r.name).filter(n=>STARTERS.indexOf(n)<0);
+// Trophies are pulled OUT of the drip so a deed always grants something the player did not
+// already have. Each is tied to a deed that is legible without reading anything.
+const TROPHIES = {
+  'wc':        'David',        // win the World Cup — the heaviest fighter for the biggest prize
+  'rush2':     'Puffball',     // clear the gauntlet once and loop it
+  'tutorial':  'Firey Jr.',    // finish How to Play
+  'boss:Announcer': 'Ruler',
+  'boss:Four':      'Liy',
+  'boss:Golf Ball': 'Book',
+  'boss:Pencil':    'Match',   // starter-adjacent, harmless if already owned
+  'boss:Bomby':     'Naily',
+};
+const TROPHY_FIGHTERS = new Set(Object.values(TROPHIES));
+const DRIP_ORDER = UNLOCK_ORDER.filter(n=>!TROPHY_FIGHTERS.has(n));
+// Fast early, slowing later. Target from the spec: first unlock by match 2, 3+ within 5 matches.
+// Keyed on matches PLAYED, never wins — a new player on Normal AI may win none of their first five.
+function dripCount(m){
+  if(m<=3) return m;                            // one per match to start
+  if(m<=11) return 3 + Math.floor((m-3)/2);     // then every other match
+  return 7 + Math.floor((m-11)/3);              // then every third
+}
+let PENDING_UNLOCKS = [];      // computed synchronously so showResult can render before the save
+
+// Grant everything the profile has now earned. Returns the newly-unlocked names.
+function syncUnlocks(){
+  if(!PROFILE) return [];
+  const fresh=[];
+  const want = Math.min(dripCount(PROFILE.matches), DRIP_ORDER.length);
+  for(let i=0;i<want;i++){ if(unlockFighter(DRIP_ORDER[i])) fresh.push(DRIP_ORDER[i]); }
+  return fresh;
+}
+function awardTrophy(key){
+  const name = TROPHIES[key];
+  if(!name || !PROFILE) return [];
+  const fresh = unlockFighter(name) ? [name] : [];
+  PENDING_UNLOCKS.push(...fresh);
+  saveProfile();
+  return fresh;
+}
+// Normal match end. Synchronous by design: recordMatch is async and unawaited while showResult
+// fires on a 700ms timer, so computing the delta here removes the race entirely.
+function awardMatchProgress(winTeam){
+  if(!PROFILE) return [];
+  if(CUSTOM_LEVEL) return [];          // level-editor playtests are not progression (farmable)
+  if(TESTMODE.active || TUT.active) return [];
+  PROFILE.matches++;
+  const you = fighters.find(f=>f.you);
+  if(you){ if(you.team===winTeam) PROFILE.wins++; PROFILE.kos += (you.killCount||0); }
+  const fresh = syncUnlocks();
+  PENDING_UNLOCKS.push(...fresh);
+  saveProfile();
+  return fresh;
+}
+function awardTutorialUnlock(){ return awardTrophy('tutorial'); }
+function awardBossCleared(name){
+  if(!PROFILE) return [];
+  PROFILE.bossesCleared[name] = true;
+  return awardTrophy('boss:'+name);
+}
+function awardRushLoop(loop){
+  if(!PROFILE) return [];
+  PROFILE.bestRushLoop = Math.max(PROFILE.bestRushLoop|0, loop|0);
+  saveProfile();
+  return loop>=2 ? awardTrophy('rush2') : [];
+}
+// Gated on the player actually winning it in normal mode, and idempotent — TOURNEY.champion is
+// assigned once but showTourneyHub() re-renders, which would otherwise double-count.
+function awardWorldCup(team){
+  if(!PROFILE || !TOURNEY || TOURNEY.mode!=="normal") return [];
+  if(!team || team!==TOURNEY.myTeam || TOURNEY.eliminated) return [];
+  if(TOURNEY.awarded) return [];
+  TOURNEY.awarded = true;
+  PROFILE.wcTitles++;
+  return awardTrophy('wc');
 }
 
 async function recordMatch(winTeam){
