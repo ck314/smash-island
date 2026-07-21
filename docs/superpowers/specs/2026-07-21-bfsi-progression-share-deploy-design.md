@@ -53,16 +53,20 @@ No secret is hardcoded anywhere; the exposure is reputational and trust-related,
 |---|---|
 | Goal | **Both, re-sequenced** — keep the modular architecture, but land player-facing value and a public URL far earlier than Plan C |
 | Sequencing | **Monolith wins first, then refactor.** See §2.1 — the cost is real but bounded, *not* zero as an earlier draft claimed |
-| Scope | Tier 0 strip → **C** tournament → **A** progression → **B** share → deploy |
+| Scope | **0** strip → **P** deploy → **S** seed & observe → **C** tournament → **A** progression. **B (share) is deferred** — see §6 |
 | Unlock model | **Hybrid** — fast drip cadence + ~8–10 hand-authored trophies |
 | Unlock escape hatch | **"Show everything" settings toggle** |
 | API key | **Remove entirely**; scripted AI teammate becomes the only path |
-| Share format | Highlight **GIF** via a vendored MIT encoder |
+| Share loop (B) | **Deferred to after Plan A**, where a real npm GIF dependency replaces a hand-vendored copy and the seek design can be rebuilt on a wall-clock timestamp |
+| C rating source | **Measured win rates from `balance:tallies`**, with a baked-in static fallback for fresh installs |
 | Host | **Vercel**, static from `artifacts/V1` (`vercel.json` committed on `main`) |
-| Deploy timing | **After** the Tier 0 strip — the box is never public |
+| Deploy timing | **Immediately after Workstream 0** — not after the feature work. Front-loads environment risk and gets real players weeks earlier |
+| Validation | **Seed and observe before building C/A** — real player behavior decides their priority |
 | Repo | `github.com/ck314/smash-island`, public, `main` default |
 
-**Out of scope:** touch/mobile controls, balance passes, any Plan A–D work, in-game accounts, chat, matchmaking.
+**Out of scope:** touch/mobile controls, balance passes, any Plan A–D work, in-game accounts, chat, matchmaking, **and the share loop (B)**.
+
+**Inherited surface to decide at deploy:** `autoJoinFromLink()` (`:6171`, called at boot `:6510`) parses `#room=CODE` from the URL and calls `NET.join()` after 60ms with **no confirmation**; codes are 2–8 alphanumeric. It is latent today — a static deploy has no relay at the same-origin `/api/ws` path, so the socket fails — but it becomes live surface the moment Plan D stands one up. Decide during Workstream P whether to disable it until Plan D defines its security model.
 
 ### 2.1 The real cost of sequencing before the refactor
 
@@ -114,7 +118,7 @@ Deleting `planSetKey()` without deleting `planKeyBtn` (`:536`) leaves a live but
 
 `teamStrength()` (`:1473`) is called only from `simGroupMatch()` (`:1460`) and `simKnockoutMatch()` (`:1516`) — both **unwatched simulations**. Playable matches already use real physics, so this workstream cannot affect hands-on gameplay.
 
-> **🔴 BLOCKING — the original design was inverted. Do not implement until resolved.**
+> **⚠️ RESOLVED — but read this, because the original design was inverted and the trap is easy to re-enter.**
 >
 > An earlier draft derived the rating from `RANGE_PROFILE[r.kit.special]` (`:3605`), calling it "a curated, balance-tuned table." It *is* balance-tuned — and that is exactly the problem. It is a **compensation** table: its values were adjusted to *flatten* win rates, so high stats mark historically **weak** fighters. Verified in the table's own comments:
 >
@@ -128,9 +132,17 @@ Deleting `planSetKey()` without deleting `planKeyBtn` (`:536`) leaves a live but
 >
 > A rating built from `reach`/`dmg`/`kb` would rank the roster **roughly backwards**, making the World Cup systematically favor the weakest fighters — the precise inverse of this workstream's goal, and the §8 criterion-3 gate (which only checks upset *spread*) would not catch it.
 >
-> **Rating source is therefore an open decision** (see handoff). The obvious candidate the original draft never considered: `balance:tallies` in `BStore` already persists real per-fighter `{games, wins, kos, falls, dmgDealt}` from actual play (`:4756`) — the measured signal, not the compensation for it. Whatever source is chosen, acceptance must validate the **sign** of the correlation against measured win rates, not just the spread.
+> **Decision: rate from measured win rates in `balance:tallies`** — `BStore` already persists real per-fighter `{games, wins, kos, falls, dmgDealt}` from actual play (`:4756`). That is the measured signal, not the compensation for it. `RANGE_PROFILE` must not be used as a quality input.
 
-**Design (pending the rating-source decision):** a new `fighterRating(r)` returns a deterministic scalar; fighters with no data fall through to `1.0`. `teamStrength(t)` sums member ratings and contains **no `Math.random()`**.
+**Design.** `fighterRating(r)` returns a deterministic scalar derived from that fighter's measured win rate in `balance:tallies`.
+
+**The sparse-data problem is the main design work here.** `balance:tallies` is local, per-browser, and empty on a fresh install — the common case for the new players this whole effort targets. So the rating needs:
+- A **baked-in static fallback table**, authored once from the measured 1v1 percentages already recorded in the `RANGE_PROFILE` comments (`92%` Golf Ball, `8%` Toothpaste, `15%` Pillow, `90%` Bomby, …). This is the default and makes ratings portable and reproducible.
+- **Local tallies used only above a minimum sample threshold**, blended toward the static baseline below it, so three lucky matches can't reshape a bracket.
+
+**Acceptance must validate the sign, not just the spread.** Rank all fighters by `fighterRating` and correlate against known win rates; require a **positive** correlation. The upset-band check alone would pass an inverted rating.
+
+`teamStrength(t)` sums member ratings and contains **no `Math.random()`**.
 
 **Retain the `let s=1` baseline.** Today's `teamStrength` starts at `1` and adds `0.5–1.0` per member. That baseline is the dominant equalizing term — at team size 1 it compresses win probability to roughly 0.43–0.57. Dropping it silently multiplies effective spread and makes the target band in the next paragraph unreachable.
 
@@ -180,21 +192,37 @@ profile:v1 = { matches, wins, kos, bossesCleared:{}, bestRushLoop, wcTitles, unl
 
 ---
 
-## 6. Workstream B — Highlight clip and share
+## 6. Workstream B — Highlight clip and share — **DEFERRED**
 
-**Goal:** convert the recorder from an artifact into something a 13-year-old actually shares.
+**Not in this scope.** Deferred to after Plan A. Recorded here so the reasoning isn't lost and the eventual design doesn't repeat the mistakes.
 
-The recorder (`:1728-1755`) captures the whole match at 30fps and exports `bfsi-match.webm` (`:1774`). A full-match WebM in a downloads folder is not shareable content; a short highlight is.
+**Why deferred — three independent reasons, all verified:**
 
-**Constraint discovered during design:** `RUN_REC.rec.start(1000)` produces 1-second chunks, but **WebM chunks after the first carry no headers**, so slicing `RUN_REC.chunks` cannot yield a valid clip. The highlight must be produced by seeking the finished `<video>` and redrawing frames to an offscreen canvas.
+1. **The seek target does not exist.** The original design keyed off `lastKoFrame` (`:1015`), but that is `hazardT` — a counter incremented once per `step()` inside the rAF loop (`:3077`), reset at three sites, and frozen while paused. The recording is `cv.captureStream(30)`, wall-clock. There is **no fixed conversion** between them: on a 120Hz display the sim counter runs ~4× the capture rate; on a throttled Chromebook, slower. Worst on exactly the hardware §8 targets. The stated risk ("WebM seek is unreliable") was a real but *different* problem — the actual defect is that the seek offset can't be derived at all.
+2. **It needs a dependency the refactor makes unnecessary.** B is the only workstream requiring third-party code, hand-vendored solely because the file has no build step — a constraint that expires when Plan A lands. Vendoring an unreviewed ~8KB encoder into a public, child-facing page is also the exact supply-chain risk Workstream 0 exists to remove.
+3. **It manufactures traffic the deploy can't serve.** Middle-school link sharing happens on phones; `navigator.share()` is a phone API; the recipient taps on a phone. With touch controls out of scope, B's share loop terminates on an unplayable page.
 
-**Design.** `lastKoFrame` (`:1015`, updated on every KO at `:4607`) already marks the final KO. On the result screen, seek to shortly before it, redraw ~4s at reduced resolution and framerate to an offscreen canvas, and encode with a **vendored MIT GIF encoder (~8KB)**. Auto-name from match context: `bfsi-Leafy-4KO.gif`.
+**When it returns, it must:** record a wall-clock mark (`performance.now()`) at recorder start and at each KO rather than relying on a sim counter; use a real versioned GIF dependency; and either land alongside a phone-playable build or explicitly discount its conversion.
 
-The single `Save Clip` action becomes three: **Save GIF · Share · Copy link**. `Share` uses `navigator.share()` with the file where supported. `Copy link` points at the deployed URL from §7 — which is why deploy is part of this scope rather than a follow-up.
+Also still open from the recorder audit: WebM chunks after the first carry no headers, so slicing `RUN_REC.chunks` can never yield a valid clip — a rolling capture buffer is the likely primary design, not a fallback.
 
-**This is the highest-risk workstream.** Seeking a `MediaRecorder`-produced WebM to an exact timestamp is unreliable across browsers. A fallback must be designed in: if seek accuracy fails, capture a rolling highlight buffer during play instead. B is sequenced last of the four precisely so it can slip without blocking anything else.
+---
 
-**Done when:** a finished match yields a playable, correctly-named GIF under a sane file size; the flow degrades gracefully where `MediaRecorder`, `navigator.share`, or seeking is unsupported; and no path can break the result screen.
+## 6a. Workstream S — Seed and observe
+
+**Goal:** stop guessing. This effort's premise is that progression is the bottleneck; nobody has checked.
+
+Workstream A multiplies retention and the deferred B multiplies virality — both are multipliers on an install base of **zero**. Deploy produces a URL, and nothing else in this document puts it in front of a single player. The plan could ship with every "Done when" green and the goal still fail because nobody knows the URL exists.
+
+**Scope.** After Workstream P, put the URL in front of **5–10 real target players** and watch, without coaching:
+- Where they quit, and how long they lasted
+- What device they opened it on
+- Whether they hand the laptop to someone else (the organic loop local 2P was built for)
+- Whether anyone returns a second day
+
+**Output:** observed behavior decides the priority of C vs A vs the deferred B — replacing the ordering currently fixed in §2 on inference. If observation contradicts this document, the document loses.
+
+**Done when:** at least 5 target-age players outside the project have opened the URL, and findings are written down with an explicit statement of which planned workstream they support or undercut.
 
 ---
 
@@ -216,21 +244,35 @@ The single `Save Clip` action becomes three: **Save GIF · Share · Copy link**.
 
 ## 8. Success criteria
 
+**Functional**
+
 1. No credential-collection surface exists anywhere in the shipped file.
 2. A stranger can open a URL on a school Chromebook and play, with no install and no account.
-3. World Cup outcomes correlate with fighter quality while retaining a measured upset rate in the target band.
+3. World Cup outcomes correlate **positively** with measured fighter win rate, while retaining a measured upset rate in the target band.
 4. Progress survives closing the tab, and the roster board gives a visible reason to return.
-5. A finished match produces a shareable clip and a link, in two taps.
-6. No existing player loses access to anything they can do today.
+5. No existing player loses access to anything they can do today.
+
+**Outcome** — the criteria that actually test the premise. Every criterion above can pass while the goal fails.
+
+6. At least **5 target-age players outside the project** have opened the live URL.
+7. Of observed first sessions, a stated fraction reach a **second match** — write the number down before building A, so A can be judged rather than assumed.
+8. At least one observed session shows the laptop being **handed to another player** (the organic loop), or the absence of it is recorded as a finding.
+
+Given the no-accounts / no-tracking stance in §3 — rightly a selling point — get 6–8 by sitting with real players, not by adding analytics.
 
 ---
 
 ## 9. Verification
 
-- **Golden re-record.** All four workstreams change monolith behavior, invalidating `test/golden/monolith-golden.json`. Re-run `scripts/record-monolith.mjs` **after** the last behavioral change and before resuming Plan A, so extraction diffs against the improved game.
-- **Statistical check** for C (§4) — not a spot check.
-- **Persistence check** for A: play → reload → state intact; plus a first-run path with no stored profile.
-- **Degradation checks** for B across missing `MediaRecorder`, missing `navigator.share`, and unreliable seek.
+**⚠️ Branch strategy must be decided first.** The harness (`scripts/record-monolith.mjs`, `test/golden/*.json`, `test/helpers/load-monolith.js`, `package.json`) exists **only on `feat/modular-app-refactor`**. `main` holds the monolith and `vercel.json` but none of the harness. These workstreams edit the monolith on one branch while the recorder that certifies it lives on another. Planning must state which branch the work lands on and when the two reconcile.
+
+- **Golden re-record — staged, not one pass at the end.** An earlier draft said re-record once after the last change; that destroys attribution, because the harness seeds one shared PRNG for the whole monolith realm, so removing `teamStrength`'s `Math.random()` calls shifts every downstream frame checksum. Instead:
+  - After **Workstream 0** and **P**: re-record and require a **zero diff**. That is the real test of "zero functional loss" — a grep gate can't prove it.
+  - After **C** and after **A** separately, so any changed field is attributable to one workstream.
+  - Both goldens each time — `monolith-golden.json` **and** `monolith-golden.lite.json` (`--lite`).
+- **Sign check + statistical check** for C (§4) — correlation direction first, then the upset band. Note tournament teams are sampled *with replacement*, so "a mid-vs-mid pairing" needs a defined referent before the band means anything.
+- **Persistence check** for A: play → reload → state intact; a first-run path with no stored profile; **and an existing-install path** that must not regress.
+- **⚠️ A is invisible to the golden harness as built.** The harness constructs `new JSDOM(html, …)` with no `url`, yielding an opaque origin where `window.localStorage` throws `SecurityError`. `BStore` swallows it, so nothing crashes — and nothing persists. Either give the harness a real origin (`url: 'http://localhost/'`) and add profile scenarios, or state explicitly that A is hand-verified only and that Plan A's later parity proof does not cover it.
 - **Grep gate** for Workstream 0 — case-insensitive absence of `sk-ant`, `anthropic`, `api[ -]?key`, `apikey`, `planKey`, `planSetKey`, `PLAN_KEY`, `fonts.googleapis.com`. The original four-token gate was insufficient: none of them appear in the `🔑 API key` button, the `#teamKeyPrompt` warning, or the two key-note strings. Plus a boot assertion that no inline `on*=` handler references a missing global.
 
 ---
