@@ -5,7 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Battle for Smash Island</title>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=JetBrains+Mono:wght@500;700&display=swap');
+  /* No remote font import: the file stays fully self-contained and makes zero third-party
+     requests, which matters on a school network that filters unknown hosts. Every font-family
+     below already declares a fallback (system-ui / monospace), so type degrades cleanly. */
 
   :root{
     --grass:#7bc043; --grass-dk:#5a9c2e; --sky1:#bfe8ff; --sky2:#88cdf2;
@@ -226,11 +228,6 @@
   .planteammate{display:flex; align-items:center; gap:8px; background:#fff; border:2px solid #1c1c1c;
     border-radius:9px; padding:4px 8px; font-weight:700; font-size:13px}
   .planteamdot{width:14px; height:14px; border-radius:5px; border:2px solid #1c1c1c; flex:none}
-  .apikeybox{max-width:560px;margin:18px auto 0;width:92%;border:3px solid #1c1c1c;border-radius:14px;background:#ffffffcc;padding:12px 14px}
-  .apikey-head{font-weight:800;font-size:14px;margin-bottom:8px}
-  .apikey-opt{font-weight:500;font-size:12px;color:#5a5a5a}
-  .apikey-row{display:flex;gap:8px;align-items:center}
-  .apikey-row input{flex:1;border:2px solid #1c1c1c;border-radius:10px;padding:8px 10px;font-family:inherit;font-size:14px;min-width:0}
   .plantimer{max-width:620px;margin:0 auto 6px;width:94%;text-align:center;font-weight:800;font-size:16px;background:#1c1c1c;color:#fff;border-radius:10px;padding:6px 10px}
   .plantimer.low{background:#e0503a;animation:pulseT 0.6s ease-in-out infinite}
   @keyframes pulseT{0%,100%{transform:scale(1)}50%{transform:scale(1.04)}}
@@ -307,15 +304,6 @@
     </div>
     <div class="foot" style="margin-top:26px">59 fighters · 9 bosses · 13 assists · no account, no ads, nothing to install</div>
     <div class="foot" style="margin-top:4px;opacity:0.7">build v68 · new teams arena "The Yoyle Crossing" — bigger, landmark-driven</div>
-    <div class="apikeybox">
-      <div class="apikey-head">🔑 Claude API key <span class="apikey-opt">(optional — for real AI teammate conversation in team planning)</span></div>
-      <div class="apikey-row">
-        <input id="homeApiKey" type="password" placeholder="sk-ant-..." autocomplete="off" spellcheck="false"/>
-        <button class="btn sm" onclick="saveHomeKey()">Save</button>
-        <button class="btn ghost sm" onclick="clearHomeKey()">Clear</button>
-      </div>
-      <div class="foot" id="homeKeyNote">Not set — team planning uses built-in scripted replies. Your key stays in memory only and is never saved to disk.</div>
-    </div>
   </div>
 
   <!-- PRE-MATCH CO-OP PLANNING -->
@@ -496,13 +484,6 @@
         <span class="teamchat-caret" id="teamChatCaret">▼</span>
       </button>
       <div class="teamchat-body" id="teamChatBody">
-        <div id="teamKeyPrompt" class="teamkeyrow" style="display:none">
-          <div class="planlabel" style="color:#ffd23f">⚠ Team chat needs a Claude API key to start</div>
-        </div>
-        <div class="planrow">
-          <div class="planlabel">Claude API key <span style="opacity:.6">(optional — upgrades chat to real conversation)</span></div>
-          <input type="password" id="teamApiKey" placeholder="sk-ant-... (optional)" autocomplete="off" spellcheck="false" oninput="syncTeamKey()" style="flex:1;min-width:0">
-        </div>
         <div class="planteams">
           <div class="planteamcol">
             <div class="planteamhead planteamhead-you">YOUR TEAM</div>
@@ -533,14 +514,13 @@
         <div class="planchat">
           <div class="planchat-head">
             <span>Talk to your teammates</span>
-            <button class="btn ghost xs" id="planKeyBtn" onclick="planSetKey()">🔑 API key</button>
           </div>
           <div id="planLog" class="planlog"></div>
           <div class="planinput">
             <input id="planMsg" placeholder="e.g. 'Everyone focus the zoner, I'll flank'" maxlength="240"/>
             <button class="btn sm" onclick="planSend()">Send</button>
           </div>
-          <div class="foot" id="planKeyNote">Scripted replies by default. Add a Claude API key for real conversation.</div>
+          <div class="foot" id="planChatNote">Your teammates reply with scripted tactics — name a target or a stance and they'll follow it.</div>
         </div>
       </div>
     </div>
@@ -1030,6 +1010,13 @@ function go(id){
   if(id==='title'){ TUT.active=false; TESTMODE.active=false; TOURNEY.active=false; TOURNEY_WATCHING=null; TOURNEY_MATCH_ACTIVE=false; BOSSRUSH.active=false; PENDING_TOURNEY=null; PENDING_CUSTOM=false;
     if(RUN_REC.recording) stopRunRecording();
     const rr=document.getElementById('runReview'); if(rr) rr.innerHTML='';
+    // End any network session. Clearing the roster override alone is not enough: buildFighters
+    // branches on it and only assigns `you` when role is "host"/"client", so a stale roster left
+    // the NEXT solo match with no player-controlled fighter. And leaving `role` as "host" kept
+    // loop() broadcasting that solo match into the old room ~22x/sec. leave() resets role, ws,
+    // snapshot, players and the roster globals together, and is a no-op when already solo.
+    if(window.NET && window.NET.role!=="solo") window.NET.leave();
+    window.__netRoster=null; window.__netHumanCount=0;
   }   // leaving to title exits test/tournament/boss mode
   if(id==='title'||id==='lobby' || (id==='select' && !PENDING_CUSTOM)) CUSTOM_LEVEL=null;   // navigation clears custom level, unless we're queuing one for character select
   if(id!=='select') PENDING_CUSTOM=false;   // consumed once we leave the select screen into a match
@@ -1258,14 +1245,8 @@ function startMatch(){
     startTournament(pt.size, pt.mode);   // startTournament reads `chosen` for your team
     return;
   }
-  // Team chat works with scripted teammate replies by default; a Claude API key is OPTIONAL
-  // and only upgrades the chat to real conversation. No key required to play teams.
+  // Team chat runs on scripted teammate replies. Nothing to configure, nothing to sign up for.
   if(SETTINGS.mode==="teams" && !window.NET){
-    if(!PLAN_KEY){
-      const inp=document.getElementById('teamApiKey') || document.getElementById('homeApiKey');
-      const typed=(inp && inp.value||"").trim();
-      if(typed){ PLAN_KEY=typed; }   // use a key if they happened to enter one
-    }
     captureTeamPlan();
   }
   beginMatchNow();
@@ -1860,26 +1841,8 @@ function beginMatchNow(){
 }
 
 // ---------- pre-match co-op planning ----------
-let PLAN_KEY = "";   // optional Claude API key (kept only in memory, never stored)
-// Sync the team-panel API key field into PLAN_KEY (mandatory for teams chat).
-function syncTeamKey(){
-  const inp=document.getElementById('teamApiKey');
-  PLAN_KEY=(inp && inp.value||"").trim();
-  const prompt=document.getElementById('teamKeyPrompt');
-  if(prompt) prompt.style.display = PLAN_KEY ? 'none' : (prompt.style.display==='block'?'block':'none');
-  const note=document.getElementById('planKeyNote');
-  if(note) note.textContent = PLAN_KEY ? "Claude conversation ON." : "A key is required to start a teams match.";
-}
-function saveHomeKey(){
-  const inp=document.getElementById('homeApiKey'); PLAN_KEY=(inp.value||"").trim();
-  const note=document.getElementById('homeKeyNote');
-  if(PLAN_KEY){ note.textContent="✓ Key set — team planning will use real Claude conversation. (In memory only; cleared when you close the tab.)"; }
-  else { note.textContent="Not set — team planning uses built-in scripted replies."; }
-}
-function clearHomeKey(){
-  PLAN_KEY=""; const inp=document.getElementById('homeApiKey'); if(inp) inp.value="";
-  const note=document.getElementById('homeKeyNote'); if(note) note.textContent="Cleared. Team planning uses built-in scripted replies.";
-}
+// Teammate replies are generated locally by planScriptedReply(). There is deliberately no
+// remote call and no credential input anywhere in this file.
 // Populate the inline Team Strategy & Chat panel (called when Teams mode is selected).
 function refreshTeamChat(){
   let enemies=[], allies=[], you=null;
@@ -1928,7 +1891,6 @@ function refreshTeamChat(){
   } else {
     planMate(mate, "Ready when you are!");
   }
-  document.getElementById('planKeyNote').textContent = PLAN_KEY ? "Claude conversation ON." : "Scripted replies by default. Add a Claude API key for real conversation.";
 }
 // zoner list reused for plan threat assessment
 const ZONERS_PLAN=["ember","cap","fry","barf","serve","freeze","beam","sign","splash","dribble","debuff","buynow","ring","fly","gust","zap","spark","salsa","spike","sucker","hack","ink","payday","emberjr","measure"];
@@ -1955,10 +1917,6 @@ function planMe(text){
   const d=document.createElement('div'); d.className='me'; d.textContent=text;
   log.appendChild(d); log.scrollTop=log.scrollHeight;
 }
-function planSetKey(){
-  const k=prompt("Paste your Anthropic API key (kept in memory only, never saved).\nLeave blank to use scripted replies.", PLAN_KEY||"");
-  if(k!==null){ PLAN_KEY=k.trim(); document.getElementById('planKeyNote').textContent = PLAN_KEY ? "Claude conversation ON." : "Scripted replies by default."; }
-}
 async function planSend(){
   const inp=document.getElementById('planMsg'); const msg=(inp.value||"").trim(); if(!msg) return;
   planMe(msg); inp.value="";
@@ -1975,14 +1933,7 @@ async function planSend(){
   if(named){ document.getElementById('planFocus').value=named.name; }
   // Naming an ally with a protect word sets the protect target.
   if(/protect|guard|cover|watch/.test(low)){ const ally=allies.find(a=>low.includes(a.name.toLowerCase())); if(ally) document.getElementById('planProtect').value=ally.name; }
-  if(PLAN_KEY){
-    planMate(mate, "…");
-    try{ const reply=await planLLM(msg, allies, enemies); 
-      const log=document.getElementById('planLog'); log.lastChild.innerHTML=`<b>${mate}:</b> ${reply}`;
-    }catch(e){ const log=document.getElementById('planLog'); log.lastChild.innerHTML=`<b>${mate}:</b> (couldn't reach Claude — ${e.message}. Using scripted plan.)`; }
-  } else {
-    planMate(mate, planScriptedReply(low, enemies));
-  }
+  planMate(mate, planScriptedReply(low, enemies));
 }
 function setStanceUI(v){ const seg=document.getElementById('planStance'); seg.querySelectorAll('button').forEach(b=>{ b.classList.toggle('on', b.dataset.v===v); }); }
 function planScriptedReply(low, enemies){
@@ -1993,14 +1944,6 @@ function planScriptedReply(low, enemies){
   if(/edge|ledge|off/.test(low)) return "I'll go for edgeguards when they're launched.";
   const picks=["Sounds good. I'll watch your back.","Copy that. Let's split them up.","Roger — I'll bait, you punish."];
   return picks[Math.floor(Math.random()*picks.length)];
-}
-async function planLLM(msg, allies, enemies){
-  const sys = `You are ${allies[0]?allies[0].name:"a teammate"}, an AI fighter in a BFDI-themed platform fighter, planning with your human teammate before a team match. Your team: ${allies.map(a=>a.name).join(', ')||'(just you two)'} plus the player. Enemy team: ${enemies.map(e=>e.name).join(', ')}. Reply in ONE short, in-character line (max ~25 words) agreeing on tactics. Be concrete about focus targets or stance.`;
-  const res=await fetch("https://api.anthropic.com/v1/messages",{ method:"POST", headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({ model:"claude-sonnet-4-6", max_tokens:1000, system:sys, messages:[{role:"user",content:msg}] }) });
-  const data=await res.json();
-  const txt=(data.content||[]).filter(b=>b.type==="text").map(b=>b.text).join(" ").trim();
-  return txt || "Let's do it.";
 }
 function clamp(v,a,b){ return v<a?a:(v>b?b:v); }
 // Y of the surface a fighter is standing on (their feet) — for placing traps/van on the current floor
@@ -4725,7 +4668,15 @@ const BStore = {
       if(typeof localStorage!=="undefined"){ localStorage.removeItem(k); }
     }catch(e){}
   },
-  available(){ return (typeof window!=="undefined" && window.storage) || (typeof localStorage!=="undefined"); }
+  // Wrapped: with site data blocked, the localStorage GETTER itself throws SecurityError, which
+  // `typeof` does not shield. Unwrapped this took down every caller. Note a truthy result still
+  // only means storage is reachable, never that a write will succeed — check writes separately.
+  available(){
+    try{
+      if(typeof window!=="undefined" && window.storage) return true;
+      return typeof localStorage!=="undefined" && localStorage!==null;
+    }catch(e){ return false; }
+  }
 };
 async function recordMatch(winTeam){
   try{
@@ -6063,6 +6014,8 @@ window.NET = {
   leave(){
     if(this.ws){ try{this.ws.close();}catch(e){} }
     this.role="solo"; this.ws=null; this.snapshot=null; this.players=[];
+    // Cleared here too, not just in go('title'), so any other exit path is safe as well.
+    window.__netRoster=null; window.__netHumanCount=0;
   },
 
   send(obj){ if(this.ws && this.ws.readyState===1) this.ws.send(JSON.stringify(obj)); },
