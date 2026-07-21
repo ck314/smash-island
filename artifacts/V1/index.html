@@ -1162,7 +1162,7 @@ function syncModeUI(){
   // the inline Team Strategy & Chat panel only exists for local team matches
   const panel=document.getElementById('teamChatPanel');
   if(panel){
-    const show = isTeams && !window.NET;
+    const show = isTeams && !inNetSession();
     panel.style.display = show ? 'block' : 'none';
     if(show){ try{ refreshTeamChat(); }catch(e){ console.error("refreshTeamChat:", e); } }
   }
@@ -1303,7 +1303,7 @@ function startMatch(){
     return;
   }
   // Team chat runs on scripted teammate replies. Nothing to configure, nothing to sign up for.
-  if(SETTINGS.mode==="teams" && !window.NET){
+  if(SETTINGS.mode==="teams" && !inNetSession()){
     captureTeamPlan();
   }
   beginMatchNow();
@@ -2022,6 +2022,22 @@ function planScriptedReply(low, enemies){
   const picks=["Sounds good. I'll watch your back.","Copy that. Let's split them up.","Roger — I'll bait, you punish."];
   return picks[Math.floor(Math.random()*picks.length)];
 }
+// Escape anything peer-supplied before it reaches innerHTML. applySnapshot replaces the whole
+// fighters array with objects from the network, keeping name/color verbatim, and the HUD /
+// standings / scorecard all interpolate those into markup.
+function esc(v){ return String(v==null?'':v).replace(/[&<>"']/g, function(c){
+  return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]; }); }
+// A colour lands inside a style attribute, where HTML-escaping alone still permits nonsense.
+// Allow only hex, rgb/rgba, hsl/hsla and bare colour keywords; anything else falls back.
+function safeColor(c){
+  const v=String(c==null?'':c).trim();
+  return /^#[0-9a-fA-F]{3,8}$/.test(v) || /^(rgb|rgba|hsl|hsla)\([\d.,%\s/]+\)$/.test(v)
+      || /^[a-zA-Z]{1,20}$/.test(v) ? v : '#888888';
+}
+// True only during an actual network session. This used to be `!window.NET`, but window.NET is
+// assigned unconditionally at module scope, so that test was always false and the local team
+// planner was permanently disabled.
+function inNetSession(){ return !!(window.NET && window.NET.role && window.NET.role!=='solo'); }
 function clamp(v,a,b){ return v<a?a:(v>b?b:v); }
 // Y of the surface a fighter is standing on (their feet) — for placing traps/van on the current floor
 function feetY(f){ return f.y + f.r; }
@@ -2382,7 +2398,7 @@ function buildHUD(){
     // In local 2-player, label whose fighter is whose — otherwise nobody knows who they're controlling.
     const ptag = (LOCAL_PLAYERS>=2 && (f.you||f.you2))
       ? `<div style="font-size:8px;font-weight:800;color:${f.you?'#ffd23f':'#6fe7ff'}">${f.you?'P1':'P2'}</div>` : '';
-    c.innerHTML=`${tag}${ptag}<div class="nm">${f.name}</div><div class="pct" style="color:${pctColor(0)}">0%</div><div class="stk">●●●</div>`;
+    c.innerHTML=`${tag}${ptag}<div class="nm">${esc(f.name)}</div><div class="pct" style="color:${pctColor(0)}">0%</div><div class="stk">●●●</div>`;
     bar.appendChild(c);
   });
 }
@@ -2409,8 +2425,8 @@ function updateStandings(){
     html='<div class="standings-title">STANDINGS</div>';
     rows.forEach((f,i)=>{ const mine=f.you;
       html+=`<div class="strow${i===0?' leader':''}${mine?' self':''}"><span class="stplace">${f.dead?'✕':(i+1)}</span>`
-        +`<span class="stdot" style="background:${f.color}"></span>`
-        +`<span class="stname">${f.name}</span><span class="ststk">${f.stocks===Infinity?'∞':Math.max(0,f.stocks)}♥</span></div>`; });
+        +`<span class="stdot" style="background:${safeColor(f.color)}"></span>`
+        +`<span class="stname">${esc(f.name)}</span><span class="ststk">${f.stocks===Infinity?'∞':Math.max(0,f.stocks)}♥</span></div>`; });
   }
   box.innerHTML=html;
 }
@@ -5039,8 +5055,8 @@ function renderScorecard(){
     const medal = f.placement===1?'🥇':f.placement===2?'🥈':f.placement===3?'🥉':'';
     rows+=`<div class="scrow${f.you?' you':''}">
       <div class="scplace">${ORDINAL(f.placement)}${medal}</div>
-      <div class="scdot" style="background:${f.color}"></div>
-      <div class="scname">${f.name}${teams?` <span class="scteam">T${(f.team||0)+1}</span>`:''}${f.you?' <span class="scyou">YOU</span>':''}</div>
+      <div class="scdot" style="background:${safeColor(f.color)}"></div>
+      <div class="scname">${esc(f.name)}${teams?` <span class="scteam">T${(f.team||0)+1}</span>`:''}${f.you?' <span class="scyou">YOU</span>':''}</div>
       <div class="scstats">${kos} KO · ${falls} fall${falls===1?'':'s'}</div>
       <div class="scbar"><div class="scbar-w" style="width:${wPct}%"></div><div class="scbar-l" style="width:${lPct}%"></div>
         <span class="scbar-num">${wins.toFixed(2)} : ${losses.toFixed(2)}</span></div>
