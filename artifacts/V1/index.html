@@ -1010,6 +1010,10 @@ function go(id){
   if(id==='title'){ TUT.active=false; TESTMODE.active=false; TOURNEY.active=false; TOURNEY_WATCHING=null; TOURNEY_MATCH_ACTIVE=false; BOSSRUSH.active=false; PENDING_TOURNEY=null; PENDING_CUSTOM=false;
     if(RUN_REC.recording) stopRunRecording();
     const rr=document.getElementById('runReview'); if(rr) rr.innerHTML='';
+    // Drop the network roster override. buildFighters branches on it, and inside that branch
+    // `you` is only assigned when role is "host"/"client" — both false once we're back to solo.
+    // Leaving it set means the NEXT solo match has no player-controlled fighter at all.
+    window.__netRoster=null; window.__netHumanCount=0;
   }   // leaving to title exits test/tournament/boss mode
   if(id==='title'||id==='lobby' || (id==='select' && !PENDING_CUSTOM)) CUSTOM_LEVEL=null;   // navigation clears custom level, unless we're queuing one for character select
   if(id!=='select') PENDING_CUSTOM=false;   // consumed once we leave the select screen into a match
@@ -4661,7 +4665,15 @@ const BStore = {
       if(typeof localStorage!=="undefined"){ localStorage.removeItem(k); }
     }catch(e){}
   },
-  available(){ return (typeof window!=="undefined" && window.storage) || (typeof localStorage!=="undefined"); }
+  // Wrapped: with site data blocked, the localStorage GETTER itself throws SecurityError, which
+  // `typeof` does not shield. Unwrapped this took down every caller. Note a truthy result still
+  // only means storage is reachable, never that a write will succeed — check writes separately.
+  available(){
+    try{
+      if(typeof window!=="undefined" && window.storage) return true;
+      return typeof localStorage!=="undefined" && localStorage!==null;
+    }catch(e){ return false; }
+  }
 };
 async function recordMatch(winTeam){
   try{
@@ -5999,6 +6011,8 @@ window.NET = {
   leave(){
     if(this.ws){ try{this.ws.close();}catch(e){} }
     this.role="solo"; this.ws=null; this.snapshot=null; this.players=[];
+    // Cleared here too, not just in go('title'), so any other exit path is safe as well.
+    window.__netRoster=null; window.__netHumanCount=0;
   },
 
   send(obj){ if(this.ws && this.ws.readyState===1) this.ws.send(JSON.stringify(obj)); },
