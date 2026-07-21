@@ -228,6 +228,8 @@
   .planteammate{display:flex; align-items:center; gap:8px; background:#fff; border:2px solid #1c1c1c;
     border-radius:9px; padding:4px 8px; font-weight:700; font-size:13px}
   .planteamdot{width:14px; height:14px; border-radius:5px; border:2px solid #1c1c1c; flex:none}
+  .unlock-note{max-width:620px;margin:6px auto;width:94%;text-align:center;font-weight:800;font-size:15px;
+    background:#ffd23f;color:#1c1c1c;border:3px solid #1c1c1c;border-radius:12px;padding:8px 12px}
   .plantimer{max-width:620px;margin:0 auto 6px;width:94%;text-align:center;font-weight:800;font-size:16px;background:#1c1c1c;color:#fff;border-radius:10px;padding:6px 10px}
   .plantimer.low{background:#e0503a;animation:pulseT 0.6s ease-in-out infinite}
   @keyframes pulseT{0%,100%{transform:scale(1)}50%{transform:scale(1.04)}}
@@ -419,10 +421,11 @@
     <h1 style="font-size:30px">Pick your fighter</h1>
     <div class="legend">
       <span><b>●</b> pick a starter, or open the full roster</span>
-      <span>All 59 fighters are playable</span>
+      <span id="rosterLegend">All 59 fighters are playable</span>
       <span>Click a lit cell, pick a stadium, then start.</span>
     </div>
     <div class="board" id="board"></div>
+      <div class="foot" id="lockNote" style="display:none;margin:2px 0 6px;font-weight:700"></div>
     <div class="selbar">
       <span class="kv">YOU:</span> <b id="selName">—</b>
       <span class="kv" id="selArch" style="color:#666"></span>
@@ -620,6 +623,7 @@
     <h1 id="resultTitle">Winner!</h1>
     <div class="sub" id="resultSub" style="color:#ddd; text-align:center"></div>
     <div id="scorecard" class="scorecard"></div>
+    <div id="unlockNote" class="unlock-note" style="display:none"></div>
     <div id="runReview" class="run-review"></div>
     <div class="row" style="justify-content:center">
       <button class="btn" onclick="startMatch()">Rematch ↻</button>
@@ -1012,6 +1016,7 @@ function go(id){
   if(id==='title'){ TUT.active=false; TESTMODE.active=false; TOURNEY.active=false; TOURNEY_WATCHING=null; TOURNEY_MATCH_ACTIVE=false; BOSSRUSH.active=false; PENDING_TOURNEY=null; PENDING_CUSTOM=false;
     if(RUN_REC.recording) stopRunRecording();
     const rr=document.getElementById('runReview'); if(rr) rr.innerHTML='';
+    clearUnlockNote();
     // End any network session. Clearing the roster override alone is not enough: buildFighters
     // branches on it and only assigns `you` when role is "host"/"client", so a stale roster left
     // the NEXT solo match with no player-controlled fighter. And leaving `role` as "host" kept
@@ -1036,26 +1041,73 @@ function go(id){
 // always rendered 7 cells. Swapped for Pen, who is both recognisable and actually selectable.
 const STARTERS = ["Firey","Leafy","Bubble","Pencil","Blocky","Ice Cube","Match","Pen"];
 let SHOW_ALL_CHARS = false;
+// ONE three-state control, not two overlapping ones. A separate "show everything" setting
+// alongside the old starters/all toggle produces four states, two of which render identically —
+// so the escape hatch would be invisible in the default view, which is exactly where a confused
+// player needs it. Cycles: starters -> unlocked -> everything.
+const VIEW_MODES = ['starters','unlocked','everything'];
+function viewMode(){ return (PROFILE && PROFILE.viewMode) || 'starters'; }
+function setViewMode(v){
+  if(!PROFILE) return;
+  PROFILE.viewMode = v;
+  // Narrowing the view can strand `chosen` on a fighter that is no longer selectable — the board
+  // would show no selection at all and Start Match would launch a locked fighter.
+  if(!isUnlocked(chosen)) chosen = ROSTER.find(r=>r.play && isUnlocked(r)) || chosen;
+  saveProfile(); buildBoard();
+}
+// What a locked cell must teach. Says how to earn the fighter, not merely that it is locked.
+function unlockHint(name){
+  for(const k in TROPHIES){
+    if(TROPHIES[k]!==name) continue;
+    if(k==='wc') return 'Win the World Cup';
+    if(k==='rush2') return 'Reach Boss Rush loop 2';
+    if(k==='tutorial') return 'Finish How to Play';
+    if(k.indexOf('boss:')===0) return 'Defeat '+k.slice(5)+' in Boss Rush';
+  }
+  const i = DRIP_ORDER.indexOf(name);
+  if(i<0) return 'Keep playing';
+  let need = 0; while(need<200 && dripCount(need) < i+1) need++;
+  const left = Math.max(1, need - ((PROFILE&&PROFILE.matches)|0));
+  return 'Play '+left+' more match'+(left===1?'':'es');
+}
 function buildBoard(){
   const b=document.getElementById('board'); if(!b) return; b.innerHTML='';
-  const list = SHOW_ALL_CHARS ? ROSTER : ROSTER.filter(r=>STARTERS.includes(r.name));
+  const mode = viewMode();
+  const list = (mode==='starters') ? ROSTER.filter(r=>STARTERS.includes(r.name)) : ROSTER;
   list.forEach((r)=>{
+    const open = r.play && isUnlocked(r);
     const c=document.createElement('div');
-    c.className='cell '+(r.play?'play':'locked');
-    if(r.play && r.name===chosen.name) c.classList.add('sel');
+    c.className='cell '+(open?'play':'locked');
+    if(open && r.name===chosen.name) c.classList.add('sel');
     c.innerHTML=`<div class="dot" style="background:${r.color}"></div><span>${r.name}</span>`;
-    if(r.play){ c.onclick=()=>{ chosen=r; buildBoard(); refreshSel(); }; }
-    else { c.title=r.name+" — roadmap"; }
+    if(open){ c.onclick=()=>{ chosen=r; buildBoard(); refreshSel(); }; }
+    else {
+      const hint = unlockHint(r.name);
+      c.title = r.name+" — locked · "+hint;
+      // A 9px grid tile has no room for criterion text, and a hover tooltip does not exist on a
+      // Chromebook touchscreen. Tapping a locked cell explains it in a strip below the grid.
+      c.onclick = ()=>{ const n=document.getElementById('lockNote');
+        if(n){ n.textContent = "🔒 "+r.name+" — "+hint; n.style.display='block'; } };
+    }
     b.appendChild(c);
   });
   // the toggle lives in the grid so it can't be missed
   const t=document.createElement('div');
   t.className='cell play rostertoggle';
-  t.innerHTML = SHOW_ALL_CHARS
-    ? `<span>◂ Starters only</span>`
-    : `<span>All ${ROSTER.filter(r=>r.play).length} fighters ▸</span>`;
-  t.onclick=()=>{ SHOW_ALL_CHARS=!SHOW_ALL_CHARS; buildBoard(); };
+  const nOpen = ROSTER.filter(r=>r.play && isUnlocked(r)).length;
+  t.innerHTML = mode==='starters'   ? `<span>All ${nOpen} unlocked ▸</span>`
+              : mode==='unlocked'   ? `<span>Show all ${ROSTER.length} ▸</span>`
+              :                       `<span>◂ Starters only</span>`;
+  t.title = mode==='everything'
+    ? 'Showing every fighter, including locked ones'
+    : 'Switch which fighters the board shows';
+  t.onclick=()=>{ setViewMode(VIEW_MODES[(VIEW_MODES.indexOf(mode)+1)%VIEW_MODES.length]); };
   b.appendChild(t);
+  const note=document.getElementById('lockNote'); if(note) note.style.display='none';
+  const leg=document.getElementById('rosterLegend');
+  if(leg) leg.textContent = nOpen>=ROSTER.length
+    ? `All ${ROSTER.length} fighters unlocked`
+    : `${nOpen} of ${ROSTER.length} fighters unlocked — play to earn more`;
   refreshSel(); buildStages(); buildSettings();
 }
 
@@ -4818,6 +4870,26 @@ function dripCount(m){
 }
 let PENDING_UNLOCKS = [];      // computed synchronously so showResult can render before the save
 
+// Dedicated announcement surface. Deliberately NOT banner(): that is a single DOM node with a
+// shared clearTimeout, and the Boss Rush loop-clear path fires three banners inside 1.5s, so an
+// unlock message there is overwritten before it can be read.
+function clearUnlockNote(){
+  const n=document.getElementById('unlockNote');
+  if(n){ n.style.display='none'; n.textContent=''; }
+}
+// Renders and DRAINS the queue, so "Rematch" cannot re-announce the previous match's unlock.
+function showUnlockNote(){
+  const n=document.getElementById('unlockNote');
+  if(!n) return;
+  const fresh=[...new Set(PENDING_UNLOCKS)];
+  PENDING_UNLOCKS.length=0;
+  if(!fresh.length){ clearUnlockNote(); return; }   // the common case renders nothing at all
+  n.textContent = fresh.length===1
+    ? '★ NEW FIGHTER UNLOCKED: '+fresh[0]+'!'
+    : '★ '+fresh.length+' NEW FIGHTERS: '+fresh.join(', ')+'!';
+  n.style.display='block';
+}
+
 // Grant everything the profile has now earned. Returns the newly-unlocked names.
 function syncUnlocks(){
   if(!PROFILE) return [];
@@ -4951,6 +5023,7 @@ function showResult(winners, winTeam){
     document.getElementById('resultTitle').textContent="Draw"; document.getElementById('resultSub').textContent="";
   }
   renderScorecard();
+  showUnlockNote();   // drains PENDING_UNLOCKS; renders nothing when empty
 }
 // Build the results scorecard: every fighter ranked by placement, with KOs/falls and an OPS-style bar.
 function renderScorecard(){
