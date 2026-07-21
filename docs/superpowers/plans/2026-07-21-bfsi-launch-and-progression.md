@@ -254,7 +254,7 @@ Starters  ──▸  Unlocked  ──▸  Everything
 
 ---
 
-- [ ] **Unit 5: Deploy publicly**
+- [x] **Unit 5: Deploy publicly**
 
 **Goal:** A live URL a stranger can open. **(R2)**
 
