@@ -39,6 +39,17 @@ describe('Unit 3 — stale LAN roster does not break solo play', () => {
     expect(w.eval('window.__netRoster')).toBeFalsy();
     expect(w.eval('window.__netHumanCount')).toBeFalsy();
   });
+
+  it('going to the title ends the network session, not just the roster', () => {
+    const { window: w } = loadMonolith();
+    // A host can reach the result screen and click "Title", which never routed through leave().
+    // role stayed "host" with the socket open, and loop() broadcasts on `role==="host"` — so the
+    // next SOLO match was streamed into the old room at ~22 frames/sec.
+    w.eval('NET.role="host"; window.__netRoster=["Firey","Leafy"]; window.__netHumanCount=2;');
+    w.eval('go("title");');
+    expect(w.eval('NET.role')).toBe('solo');
+    expect(w.eval('NET.ws')).toBeFalsy();
+  });
 });
 
 describe('Unit 3 — storage probing never throws', () => {

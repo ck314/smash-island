@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
+import { join } from 'node:path';
 import { loadMonolith } from './helpers/load-monolith.js';
-import { collectHandlerIdentifiers } from '../src/core/handler-coverage.js';
 
 // Workstream 0 (Unit 2) — the deploy blocker.
 //
@@ -16,7 +16,16 @@ import { collectHandlerIdentifiers } from '../src/core/handler-coverage.js';
 // integrity: deleting planSetKey() without deleting the button that calls it leaves a live
 // control that throws on click, which no text search would catch.
 
-const SOURCE = 'artifacts/V1/index.html';
+// Scope the gate to the DEPLOY UNIT, never to one filename. Vercel serves every file under
+// outputDirectory, so a stray sibling is publicly reachable at its own URL. An earlier version of
+// this gate pinned 'artifacts/V1/index.html' and passed green while artifacts/V1 also contained
+// battle-for-smash-island.html — a second, un-stripped copy of the whole game carrying the live
+// sk-ant field. Same class of miss as the four-token version, one level up: the check was
+// narrower than the thing it guards.
+const PUBLISH_ROOT = JSON.parse(readFileSync('vercel.json', 'utf8')).outputDirectory;
+const PUBLISHED_FILES = readdirSync(PUBLISH_ROOT).map((f) => join(PUBLISH_ROOT, f));
+const PUBLISHED_HTML = PUBLISHED_FILES.filter((f) => f.endsWith('.html'));
+const SOURCE = join(PUBLISH_ROOT, 'index.html');
 
 /** Tokens that must not survive anywhere in the shipped file. */
 const FORBIDDEN = [
@@ -32,8 +41,14 @@ const FORBIDDEN = [
 ];
 
 describe('Workstream 0 — credential surface is fully stripped', () => {
-  it('contains none of the forbidden credential tokens', () => {
-    const src = readFileSync(SOURCE, 'utf8');
+  it('publishes only the files we intend to serve', () => {
+    // Anything dropped into the publish root becomes a public URL. Pin the contents so a stray
+    // build artifact fails the suite instead of silently shipping.
+    expect(PUBLISHED_FILES.map((f) => f.replace(/\\/g, '/'))).toEqual([`${PUBLISH_ROOT}/index.html`]);
+  });
+
+  it.each(PUBLISHED_HTML)('%s contains none of the forbidden credential tokens', (file) => {
+    const src = readFileSync(file, 'utf8');
     const found = FORBIDDEN
       .filter(({ re }) => re.test(src))
       .map(({ name, re }) => {
@@ -44,8 +59,8 @@ describe('Workstream 0 — credential surface is fully stripped', () => {
     expect(found, `forbidden credential tokens still present:\n  ${found.join('\n  ')}`).toEqual([]);
   });
 
-  it('makes no network reference to a third-party host', () => {
-    const src = readFileSync(SOURCE, 'utf8');
+  it.each(PUBLISHED_HTML)('%s makes no network reference to a third-party host', (file) => {
+    const src = readFileSync(file, 'utf8');
     const externals = [...src.matchAll(/https?:\/\/([^/"'\s)]+)/g)]
       .map((m) => m[1])
       .filter((host) => !/^(localhost|127\.0\.0\.1)/.test(host));

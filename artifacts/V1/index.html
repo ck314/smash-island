@@ -1010,9 +1010,12 @@ function go(id){
   if(id==='title'){ TUT.active=false; TESTMODE.active=false; TOURNEY.active=false; TOURNEY_WATCHING=null; TOURNEY_MATCH_ACTIVE=false; BOSSRUSH.active=false; PENDING_TOURNEY=null; PENDING_CUSTOM=false;
     if(RUN_REC.recording) stopRunRecording();
     const rr=document.getElementById('runReview'); if(rr) rr.innerHTML='';
-    // Drop the network roster override. buildFighters branches on it, and inside that branch
-    // `you` is only assigned when role is "host"/"client" — both false once we're back to solo.
-    // Leaving it set means the NEXT solo match has no player-controlled fighter at all.
+    // End any network session. Clearing the roster override alone is not enough: buildFighters
+    // branches on it and only assigns `you` when role is "host"/"client", so a stale roster left
+    // the NEXT solo match with no player-controlled fighter. And leaving `role` as "host" kept
+    // loop() broadcasting that solo match into the old room ~22x/sec. leave() resets role, ws,
+    // snapshot, players and the roster globals together, and is a no-op when already solo.
+    if(window.NET && window.NET.role!=="solo") window.NET.leave();
     window.__netRoster=null; window.__netHumanCount=0;
   }   // leaving to title exits test/tournament/boss mode
   if(id==='title'||id==='lobby' || (id==='select' && !PENDING_CUSTOM)) CUSTOM_LEVEL=null;   // navigation clears custom level, unless we're queuing one for character select
