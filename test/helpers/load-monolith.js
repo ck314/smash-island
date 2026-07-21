@@ -45,6 +45,11 @@ const BRIDGE = ['SETTINGS', 'fighters', 'down', 'TOURNEY', 'running', 'stage', '
 export function loadMonolith(seed = 0xC0FFEE) {
   const html = readFileSync('artifacts/V1/index.html', 'utf8');
   const dom = new JSDOM(html, {
+    // A real origin, not the default opaque one. Without `url`, localStorage is absent, BStore
+    // swallows the failure, and NOTHING persists — which made the whole progression layer
+    // (profile:v1, unlocks, grandfathering) structurally invisible to the goldens. Each JSDOM
+    // gets its own empty localStorage, so scenarios stay isolated and reproducible.
+    url: 'http://localhost/',
     runScripts: 'dangerously',
     pretendToBeVisual: true,
     beforeParse(window) {

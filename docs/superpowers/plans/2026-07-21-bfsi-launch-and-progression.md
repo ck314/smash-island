@@ -310,7 +310,7 @@ Starters  ──▸  Unlocked  ──▸  Everything
 
 ### Phase 2 — Tournament hardening (gated on Unit 6)
 
-- [ ] **Unit 7: Tournament simulation hardening**
+- [x] **Unit 7: Tournament simulation hardening**
 
 **Goal:** Remove real defects from the simulator. **No ratings** — see Overview. **(R3)**
 
@@ -339,7 +339,7 @@ Starters  ──▸  Unlocked  ──▸  Everything
 
 ### Phase 3 — Progression (gated on Unit 6)
 
-- [ ] **Unit 8: Profile storage layer**
+- [x] **Unit 8: Profile storage layer**
 
 **Goal:** A durable, corruption-tolerant, multi-tab-safe profile. **(R4, R5)**
 
@@ -373,7 +373,7 @@ Starters  ──▸  Unlocked  ──▸  Everything
 
 ---
 
-- [ ] **Unit 9: Progression hooks**
+- [x] **Unit 9: Progression hooks**
 
 **Goal:** Wire every legitimate achievement moment to the profile. **(R4)**
 
@@ -406,7 +406,7 @@ Starters  ──▸  Unlocked  ──▸  Everything
 
 ---
 
-- [ ] **Unit 10: Unlock model and roster board**
+- [x] **Unit 10: Unlock model and roster board**
 
 **Goal:** Locked cells that teach, and one roster control. **(R4, R5)**
 
@@ -440,7 +440,7 @@ Starters  ──▸  Unlocked  ──▸  Everything
 
 ---
 
-- [ ] **Unit 11: Announcement surface**
+- [x] **Unit 11: Announcement surface**
 
 **Goal:** Unlocks are actually seen, on every screen where they can be earned. **(R4)**
 
@@ -470,7 +470,7 @@ Starters  ──▸  Unlocked  ──▸  Everything
 
 ### Phase 4 — Verification
 
-- [ ] **Unit 12: Harness origin and final re-records**
+- [x] **Unit 12: Harness origin and final re-records**
 
 **Goal:** Make progression verifiable and attribute remaining behavior changes.
 
