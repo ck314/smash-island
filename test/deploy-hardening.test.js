@@ -65,6 +65,20 @@ describe('Unit 5 — an invite link never connects without consent', () => {
     const w = loadWithHash('#room=!!!!');
     expect(w.document.getElementById('title').classList.contains('active')).toBe(true);
   });
+
+  it('responds to an invite link clicked while already on the site', async () => {
+    // Found on the live deployment: autoJoinFromLink() ran only at boot. A player already on
+    // the page who clicks a friend's link performs a SAME-DOCUMENT navigation — the script never
+    // re-runs, so nothing happens at all. That silently breaks the exact flow the lobby copy
+    // promises ("Share it (or the link) and your friends drop straight in").
+    const w = loadWithHash('');
+    expect(w.document.getElementById('title').classList.contains('active')).toBe(true);
+    w.location.hash = '#room=WXYZ';
+    await new Promise((r) => setTimeout(r, 150));
+    expect(w.document.getElementById('joinAddr').value).toBe('WXYZ');
+    expect(w.document.getElementById('lobby').classList.contains('active')).toBe(true);
+    expect(w.eval('NET.role')).toBe('solo');   // still consent-gated, no auto-connect
+  });
 });
 
 describe('Unit 5 — the title screen answers the gatekeeper', () => {
