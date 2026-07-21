@@ -1,6 +1,7 @@
 ---
 module: verification-gates
 date: 2026-07-21
+last_updated: 2026-07-21
 problem_type: best_practice
 component: testing_framework
 severity: high
@@ -25,9 +26,9 @@ tags:
 
 ## Context
 
-In one session on Battle for Smash Island, three separate checks were written, reviewed, and believed correct. All three ran green. **All three measured something other than what they were believed to measure**, and each would have shipped the exact failure it was written to prevent.
+In one session on Battle for Smash Island, four separate checks were written, reviewed, and believed correct. All four ran green. **All four measured something other than what they were believed to measure**, and each would have shipped the exact failure it was written to prevent.
 
-They looked unrelated — a security gate, a game-balance rating, a statistical acceptance criterion. They are the same mistake.
+They looked unrelated — a security gate, a game-balance rating, a statistical acceptance criterion, a test harness. They are the same mistake.
 
 A check that is absent is a known gap. A check that is present and measures the wrong thing is worse: it manufactures confidence and closes off further inspection. In every instance below, the green result actively suppressed the question that would have found the problem.
 
@@ -35,7 +36,7 @@ A check that is absent is a known gap. A check that is present and measures the 
 
 **Before trusting a check, ask: what would it do if the thing I fear were true?** If the answer is "pass," the check is decorative. Run that question against the check itself, not the code it guards.
 
-Three specific forms this takes:
+Four specific forms this takes:
 
 ### 1. Scope the gate to the deploy unit, never to a sample of it
 
@@ -101,13 +102,30 @@ Right:  assert the rating correlates POSITIVELY with an independent signal,
         THEN assert the spread
 ```
 
+### 4. A harness can be structurally blind to an entire layer
+
+The golden test harness booted the app with `new JSDOM(html, { … })` and no `url`. That yields an **opaque origin**, where `window.localStorage` is absent. The app's storage wrapper swallows the failure by design ("recording must never break the game"), so nothing crashed — and nothing persisted.
+
+Consequence: the entire persistence layer — the player profile, unlocks, the grandfathering path — was **invisible to every golden test**, and would have been invisible to the later module-parity proof that is supposed to guarantee a refactor changed nothing. The suite was green the whole time. It was green because it could not see.
+
+Worse, the naive fix is also wrong. A test asserting "storage probing does not throw when storage is denied" *passes in a plain jsdom realm without any fix at all*, because `localStorage` there is merely `undefined` and `typeof` shields it. The real browser failure — cookies blocked, where the **getter itself throws** `SecurityError` — is never exercised. The test must install a throwing getter explicitly, or it proves nothing:
+
+```js
+Object.defineProperty(window, 'localStorage', {
+  configurable: true,
+  get() { throw new DOMException('denied', 'SecurityError'); },
+});
+```
+
+Ask of any harness: *which categories of behavior can this environment not express?* Storage, timers, network, focus, and visibility are the usual answers, and each one silently converts a class of test into a no-op.
+
 ## Why This Matters
 
 The cost profile is asymmetric. A missing check leaves a visible gap that review, intuition, or a later reader can still catch. A check that measures the wrong thing **removes** those chances — it answers the question so nobody asks it again, and its green result is cited as evidence in exactly the reviews that would otherwise have found the problem.
 
-In this session the three instances would have produced, respectively: a credential-phishing surface deployed to children at a guessable URL; a flagship tournament mode systematically rewarding the worst fighters; and a multi-day compute investment whose output could not be validated at all.
+In this session the four instances would have produced, respectively: a credential-phishing surface deployed to children at a guessable URL; a flagship tournament mode systematically rewarding the worst fighters; a multi-day compute investment whose output could not be validated at all; and a refactor-safety proof that silently excluded the entire persistence layer.
 
-None were caught by running the checks. All three were caught by asking what the check would do if the feared thing were true.
+None were caught by running the checks. The first three were caught by asking what the check would do if the feared thing were true. The fourth was caught only when a reviewer instrumented the harness itself and measured what it could observe — which is the same question aimed one level lower, at the environment rather than the assertion.
 
 ## When to Apply
 
@@ -116,7 +134,7 @@ Highest value when:
 - **A single automated gate carries a safety argument.** Especially security, privacy, or anything that becomes publicly reachable. Ask what the deploy unit actually is — a directory, a bundle, an image — and scope to that, derived from the deployment config rather than restated by hand.
 - **You are about to derive a metric from data you did not produce.** Ask what the data's author was optimizing. If they were correcting an outcome, the values encode the correction.
 - **An acceptance criterion is statistical.** Check that it can fail in the direction you actually fear. Spread, variance, and distribution checks routinely miss sign errors and inversions.
-- **A verification is "cheap" and was written quickly.** All three instances here were written fast because they seemed obvious. The gate was the deliverable that made the whole workstream trustworthy, and it was the least examined thing in it.
+- **A verification is "cheap" and was written quickly.** All four instances here were written fast because they seemed obvious. The gate was the deliverable that made the whole workstream trustworthy, and it was the least examined thing in it.
 
 Lower value for checks whose scope is inherently the whole artifact (a full-suite run, a type check), where the narrowing failure cannot occur.
 
