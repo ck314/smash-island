@@ -1389,9 +1389,17 @@ function startTournament(teamSize, mode){
   // build 48 teams; each team is `teamSize` fighters
   const teams=[];
   for(let i=0;i<48;i++){
-    const members=[];
-    for(let m=0;m<teamSize;m++){ members.push(pool[Math.floor(Math.random()*pool.length)]); }
+    // Draw WITHOUT replacement within a team — otherwise a 2v2 side can field the same fighter
+    // twice, which renders identically in standings ("Firey +1") and is indistinguishable from a
+    // real pairing. Across teams, duplicates remain intentional: 48 teams drawn from 59.
+    const members=[]; const bag=[...pool];
+    for(let m=0;m<teamSize && bag.length;m++){ members.push(bag.splice(Math.floor(Math.random()*bag.length),1)[0]); }
     teams.push({ id:i, name: teamName(members, i), members,
+      // Stable per-team tiebreak. Assigned ONCE here, never recomputed, so cmpTeam stays a
+      // consistent comparator — it is passed to .sort() in three places and re-sorts all 12
+      // groups on every hub render. Randomising inside the comparator would break sort
+      // invariants and reshuffle unchanged standings on every repaint.
+      tieKey: Math.random(),
       P:0, W:0, D:0, L:0, sf:0, sa:0, pts:0, group:Math.floor(i/4), groupRank:0 });
   }
   // NORMAL MODE: put YOUR chosen fighter on your team so you play as who you picked.
@@ -1457,7 +1465,12 @@ function teamStrength(t){
   // baseline + tiny per-member variance so matches aren't deterministic
   let s=1;
   for(const m of t.members){ s += 0.5 + Math.random()*0.5; }
-  return s;
+  // FLOOR — do not remove. simGroupMatch rolls Math.random()*(strA+strB) and compares < strA.
+  // If strength ever reaches <= 0 the roll goes negative, is therefore ALWAYS < strA, and team A
+  // wins 5-0 every single time regardless of which side is stronger. Today's formula cannot go
+  // negative; this guards the fighter-rating work that is deferred but still intended, where a
+  // centred or z-scored rating makes s <= 0 reachable at team size >= 2.
+  return Math.max(0.01, s);
 }
 function applyGroupResult(A,B,sa,sb){
   A.P++; B.P++; A.sf+=sa; A.sa+=sb; B.sf+=sb; B.sa+=sa;
@@ -1473,7 +1486,10 @@ function cmpTeam(a,b){
   const gdA=a.sf-a.sa, gdB=b.sf-b.sa;
   if(gdB!==gdA) return gdB-gdA;                        // stock difference
   if(b.sf!==a.sf) return b.sf-a.sf;                    // stocks scored
-  return a.id-b.id;
+  // Stable random key, not a.id-b.id. At kickoff every team is tied on all three criteria above,
+  // so this decides the whole table — falling back to array index made low-numbered teams place
+  // higher before a single match was played, and that bias survived into knockout seeding.
+  return (a.tieKey||0)-(b.tieKey||0);
 }
 // After all 3 matchdays, seed the knockout bracket.
 function seedKnockout(){
