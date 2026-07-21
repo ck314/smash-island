@@ -6470,6 +6470,10 @@ async function resetStats(){
 // ---------- boot ----------
 buildBoard();
 try{ autoJoinFromLink(); }catch(e){}   // opened via a shared ...#room=ABCD invite link
+// Clicking an invite link while already on the site is a SAME-DOCUMENT navigation — the script
+// never re-runs, so without this the link silently does nothing. Nothing in the game writes
+// location.hash, so this only ever fires on a real user action.
+window.addEventListener('hashchange', ()=>{ try{ autoJoinFromLink(); }catch(e){} });
 </script>
 </body>
 </html>

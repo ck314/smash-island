@@ -279,7 +279,13 @@ Starters  ──▸  Unlocked  ──▸  Everything
 
 - [ ] **Unit 6: Seed and observe**
 
-**Goal:** Replace inference with observation. **This is a hard gate, not a suggestion.** **(R6, R7, R8)**
+**Goal:** Replace inference with observation. **(R6, R7, R8)**
+
+> **⚠️ GATE DELIBERATELY RELAXED — 2026-07-21.** This unit was written as a hard gate on Units 7–11, on the principle that progression and tournament work should be justified by observed player behavior rather than inference. The owner chose to build Units 7–11 **before** seeding, accepting that trade explicitly.
+>
+> What that costs, recorded honestly so nobody later mistakes it for validated design: **Units 8–11 are built on inference.** The four branch outcomes below never got the chance to fire, so if observation later shows players quit before finishing a match, the progression work will have been aimed at the wrong bottleneck. R7's "write the number down before building A" is also unmet by construction.
+>
+> This unit remains valuable and should still run — as **validation** rather than a gate. Its findings can still cut or redirect work that has already been built.
 
 **Requirements:** R6, R7, R8 · **Dependencies:** Unit 5
 
