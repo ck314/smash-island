@@ -302,7 +302,9 @@
       <button class="btn ghost sm" onclick="openStats()">📊 Balance Stats</button>
       <button class="btn ghost sm" id="soundToggle" onclick="toggleSound()">🔊 Sound: On</button>
     </div>
-    <div class="foot" style="margin-top:26px">59 fighters · 9 bosses · 13 assists · no account, no ads, nothing to install</div>
+    <div class="foot" style="margin-top:26px">A cartoon platform fighter starring the Battle for Dream Island cast. Knock your friends off the stage.</div>
+    <div class="foot" style="margin-top:4px">59 fighters · 9 bosses · 13 assists · no account, no ads, nothing to install</div>
+    <div class="foot" style="margin-top:10px;opacity:0.7">An unofficial fan-made game. Not affiliated with or endorsed by jacknjellify; Battle for Dream Island and its characters belong to them. Made for fun, never sold.</div>
     <div class="foot" style="margin-top:4px;opacity:0.7">build v68 · new teams arena "The Yoyle Crossing" — bigger, landmark-driven</div>
   </div>
 
@@ -6120,13 +6122,20 @@ window.NET = {
   status(msg){ const el=document.getElementById('lobbyStatus'); if(el) el.textContent=msg; },
 };
 
-// If someone opened a shared invite link (…#room=ABCD), drop them straight into that room.
+// If someone opened a shared invite link (…#room=ABCD), take them to the lobby with the code
+// already filled in — but DO NOT connect. Joining is one deliberate tap on "Join Room".
+//
+// This used to call NET.join() on a 60ms timer. On a public URL that means any link a stranger
+// sends a player opens a live session with whoever controls that room before they have seen a
+// single screen. Room codes are 4 characters, so they are also guessable at internet scale.
+// Prefilling keeps the invite-link convenience; the tap is the consent.
 function autoJoinFromLink(){
   const m = (location.hash||"").match(/room=([A-Za-z0-9]{2,8})/);
   if(!m) return false;
+  const code = m[1].toUpperCase();
   go('lobby');
-  const inp=document.getElementById('joinAddr'); if(inp) inp.value=m[1].toUpperCase();
-  setTimeout(()=>{ try{ NET.join(m[1]); }catch(e){} }, 60);
+  const inp=document.getElementById('joinAddr'); if(inp) inp.value=code;
+  NET.status("Invite link for room "+code+" — press Join Room to connect.");
   return true;
 }
 function openLobby(){ go('lobby'); NET.renderLobby(); NET.status("Not connected"); }
